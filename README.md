@@ -67,17 +67,6 @@ Nothing to edit or recompile. At launch, SUS Fetcher detects the latest major ve
 
 The public catalog already includes new installers anyway (Apple also adds them to older catalogs); detection mostly matters for beta channels, whose URL contains the version number. For troubleshooting, a custom catalog URL can be entered in Settings.
 
-## Publishing a release
-
-The [`release.yml`](.github/workflows/release.yml) GitHub Action builds the app on an Apple Silicon Mac and attaches it to a Release. Two ways to trigger it:
-
-- **Actions → Release → Run workflow**, entering the version (e.g. `v1.1.0`): the tag and the Release are created automatically.
-- Or push a tag:
-
-```bash
-git tag v1.1.0 && git push origin v1.1.0
-```
-
 ## License
 
 [MIT](LICENSE) — do whatever you want with it.
