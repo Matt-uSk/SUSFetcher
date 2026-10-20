@@ -1,14 +1,34 @@
 import AppKit
 import SwiftUI
 
-enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
+enum SidebarItem: Identifiable, Hashable {
     case installers, others, iphone, ipad, mac, downloads
-    var id: String { rawValue }
+    case favorite(String)       // id du favori (cf. Favorite.id)
+
+    var id: String {
+        switch self {
+        case .installers: "installers"
+        case .others: "others"
+        case .iphone: "iphone"
+        case .ipad: "ipad"
+        case .mac: "mac"
+        case .downloads: "downloads"
+        case .favorite(let id): "favorite:\(id)"
+        }
+    }
 
     static let catalogItems: [SidebarItem] = [.installers, .others]
     static let ipswItems: [SidebarItem] = [.iphone, .ipad, .mac]
 
-    var isCatalog: Bool { self == .installers || self == .others }
+    /// Page qui affiche des produits du catalogue (canal / filtre bêta actifs).
+    @MainActor var isCatalog: Bool {
+        switch self {
+        case .installers, .others: true
+        case .favorite(let id):
+            if case .catalog? = FavoritesStore.shared.item(id) { true } else { false }
+        default: false
+        }
+    }
 
     var ipswFamily: IPSWFamily? {
         switch self {
@@ -27,11 +47,13 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         case .iphone: "iPhone"
         case .ipad: "iPad"
         case .mac: tr("Mac (Apple Silicon)", "Mac (Apple Silicon)")
+        case .favorite(let id): FavoritesStore.shared.item(id)?.label ?? ""
         }
     }
 
-    var icon: String {
+    @MainActor var icon: String {
         switch self {
+        case .favorite(let id): FavoritesStore.shared.item(id)?.icon ?? "star"
         case .installers: "laptopcomputer.and.arrow.down"
         case .others: "shippingbox"
         case .downloads: "arrow.down.circle"
@@ -74,6 +96,7 @@ struct ContentView: View {
     let state: ViewState
 
     private var sidebar: SidebarItem? { state.sidebar }
+    private var favorites: FavoritesStore { FavoritesStore.shared }
     private var search: String { state.search }
     private var sortOrder: [KeyPathComparator<SUProduct>] { state.sortOrder }
 
@@ -97,6 +120,21 @@ struct ContentView: View {
 
     private var sidebarList: some View {
         List(selection: Binding(state, \.sidebar)) {
+            if !favorites.items.isEmpty {
+                Section(tr("Favoris", "Favorites")) {
+                    ForEach(favorites.items) { fav in
+                        Label(fav.label, systemImage: fav.icon)
+                            .lineLimit(1)
+                            .tag(SidebarItem.favorite(fav.id))
+                            .contextMenu {
+                                Button(tr("Retirer des favoris", "Remove from Favorites")) {
+                                    favorites.remove(fav.id)
+                                }
+                            }
+                    }
+                    .onMove { favorites.move(fromOffsets: $0, toOffset: $1) }
+                }
+            }
             Section(tr("Catalogue", "Catalog")) {
                 ForEach(SidebarItem.catalogItems) { item in
                     SidebarRow(item: item, count: count(for: item))
@@ -127,17 +165,33 @@ struct ContentView: View {
         } else if let family = sidebar?.ipswFamily {
             IPSWPane(family: family, model: IPSWModel.shared, downloads: downloads, search: search)
                 .id(family)
+        } else if case .favorite(let id)? = sidebar {
+            favoriteDetail(id)
         } else {
-            catalogDetail
+            catalogDetail(rows)
         }
     }
 
-    private var catalogDetail: some View {
+    @ViewBuilder
+    private func favoriteDetail(_ id: String) -> some View {
+        switch favorites.item(id) {
+        case .catalog(let title, _)?:
+            catalogDetail(filtered(visible(catalog.products).filter { $0.displayTitle == title }))
+        case .device(let identifier, let name)?:
+            IPSWFirmwarePanel(device: IPSWDevice(name: name, identifier: identifier),
+                              model: IPSWModel.shared, downloads: downloads)
+                .id(id)
+        case nil:
+            ContentUnavailableView(tr("Favori introuvable", "Favorite not found"), systemImage: "star.slash")
+        }
+    }
+
+    private func catalogDetail(_ rows: [SUProduct]) -> some View {
         ProductTable(products: rows,
                      downloads: downloads,
                      selection: Binding(state, \.selection),
                      sortOrder: Binding(state, \.sortOrder))
-            .overlay { placeholder }
+            .overlay { placeholder(rows) }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 StatusBar(catalog: catalog, downloads: downloads)
             }
@@ -204,7 +258,11 @@ struct ContentView: View {
     }
 
     private var rows: [SUProduct] {
-        let base = visible(sidebar == .others ? catalog.others : catalog.installers)
+        filtered(visible(sidebar == .others ? catalog.others : catalog.installers))
+    }
+
+    /// Recherche + tri appliqués à une liste de produits.
+    private func filtered(_ base: [SUProduct]) -> [SUProduct] {
         let q = search.trimmingCharacters(in: .whitespaces)
         let filtered = q.isEmpty ? base : base.filter {
             $0.displayTitle.localizedCaseInsensitiveContains(q)
@@ -220,13 +278,14 @@ struct ContentView: View {
         case .installers: visible(catalog.installers).count
         case .others: visible(catalog.others).count
         case .downloads: downloads.pendingCount
+        case .favorite: 0
         case .iphone, .ipad, .mac:
             item.ipswFamily.map { IPSWModel.shared.count($0) } ?? 0
         }
     }
 
     @ViewBuilder
-    private var placeholder: some View {
+    private func placeholder(_ rows: [SUProduct]) -> some View {
         if catalog.products.isEmpty {
             if catalog.isLoading {
                 ProgressView(catalog.status ?? tr("Chargement…", "Loading…"))
@@ -250,6 +309,11 @@ struct ContentView: View {
             } actions: {
                 Button(tr("Tout afficher", "Show all")) { state.betaOnly = false }
             }
+        } else if rows.isEmpty, case .favorite? = sidebar, !catalog.isLoading {
+            ContentUnavailableView(tr("Rien pour ce favori dans ce catalogue", "Nothing for this favorite in this catalog"),
+                                   systemImage: "star.slash",
+                                   description: Text(tr("Apple a peut-être retiré ce produit, ou le canal choisi ne le contient pas.",
+                                                        "Apple may have removed this product, or the selected channel doesn't contain it.")))
         }
     }
 }
@@ -290,6 +354,7 @@ struct ProductTable: View {
                     Text(p.displayTitle)
                         .foregroundStyle(p.metadataLoaded ? HierarchicalShapeStyle.primary : HierarchicalShapeStyle.secondary)
                     if p.isBeta { BetaBadge() }
+                    if FavoritesStore.shared.contains(.of(p)) { FavoriteStar() }
                 }
             }
             .width(min: 180, ideal: 240)
@@ -343,6 +408,8 @@ struct ProductTable: View {
                 Divider()
                 Button(tr("Tous les paquets", "All packages")) { downloads.downloadAll(of: p) }
             }
+            Divider()
+            Button(favoriteMenuTitle(.of(p))) { FavoritesStore.shared.toggle(.of(p)) }
             Divider()
             Button(tr("Copier le Product ID", "Copy Product ID")) { copy(p.id) }
             if let ia = p.installAssistant {

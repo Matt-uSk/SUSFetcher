@@ -393,14 +393,21 @@ struct IPSWPane: View {
     private var devicesColumn: some View {
         List(selection: Binding(get: { selectedID }, set: { model.select($0, in: family) })) {
             ForEach(deviceList) { d in
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(d.name).lineLimit(1)
-                    if d.name != d.identifier {
-                        Text(d.identifier).font(.caption.monospaced()).foregroundStyle(.secondary)
+                HStack {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(d.name).lineLimit(1)
+                        if d.name != d.identifier {
+                            Text(d.identifier).font(.caption.monospaced()).foregroundStyle(.secondary)
+                        }
                     }
+                    Spacer(minLength: 4)
+                    if FavoritesStore.shared.contains(.of(d)) { FavoriteStar() }
                 }
                 .padding(.vertical, 2)
                 .tag(d.identifier)
+                .contextMenu {
+                    Button(favoriteMenuTitle(.of(d))) { FavoritesStore.shared.toggle(.of(d)) }
+                }
             }
         }
         .listStyle(.sidebar)
@@ -426,40 +433,8 @@ struct IPSWPane: View {
     @ViewBuilder
     private var firmwaresColumn: some View {
         if let device = selectedDevice {
-            VStack(spacing: 0) {
-                HStack(spacing: 10) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(device.name).font(.headline)
-                        if device.name != device.identifier {
-                            Text(device.identifier).font(.caption.monospaced()).foregroundStyle(.secondary)
-                        }
-                    }
-                    Spacer()
-                    Toggle(tr("Signés uniquement", "Signed only"), isOn: Binding(model, \.signedOnly))
-                        .toggleStyle(.checkbox)
-                    Button {
-                        model.loadFirmwares(device.identifier, force: true)
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .buttonStyle(.borderless)
-                    .help(tr("Recharger", "Reload"))
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-
-                if let banner = fallbackBanner(model.firmwareSources[device.identifier]) {
-                    banner
-                }
-                Divider()
-                IPSWFirmwareTable(firmwares: rows(for: device),
-                                  device: device,
-                                  downloads: downloads,
-                                  selection: Binding(model, \.firmwareSelection),
-                                  sortOrder: Binding(model, \.sortOrder))
-                    .frame(maxHeight: .infinity)
-                    .overlay { firmwareOverlay(device) }
-            }
+            IPSWFirmwarePanel(device: device, model: model, downloads: downloads)
+                .id(device.identifier)
         } else {
             ContentUnavailableView(tr("Choisir un appareil", "Choose a device"),
                                    systemImage: icon,
@@ -467,6 +442,107 @@ struct IPSWPane: View {
                                                         "Firmwares (IPSW) for the selected model appear here.")))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    private var icon: String {
+        switch family {
+        case .iPhone: "iphone"
+        case .iPad: "ipad"
+        case .mac: "laptopcomputer"
+        }
+    }
+
+    private var footer: some View {
+        HStack(spacing: 6) {
+            sourceLabel
+            Spacer()
+            Button {
+                NSWorkspace.shared.open(downloads.destinationFolder)
+            } label: {
+                Label(downloads.destinationFolder.lastPathComponent, systemImage: "folder")
+            }
+            .buttonStyle(.borderless)
+            .help(downloads.destinationFolder.path)
+        }
+        .font(.callout)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(.bar)
+    }
+
+    @ViewBuilder
+    private var sourceLabel: some View {
+        switch model.devicesSource {
+        case .cache?:
+            Label(tr("Source : ipsw.me (hors ligne, cache)", "Source: ipsw.me (offline, cached)"),
+                  systemImage: "wifi.slash")
+                .foregroundStyle(.orange)
+        case .apple?:
+            Label(tr("Source : Apple (secours)", "Source: Apple (fallback)"), systemImage: "applelogo")
+                .foregroundStyle(.orange)
+        default:
+            HStack(spacing: 4) {
+                Text(tr("Source :", "Source:")).foregroundStyle(.secondary)
+                Link("ipsw.me", destination: URL(string: "https://ipsw.me")!)
+            }
+        }
+    }
+}
+
+/// Firmwares d'un appareil : en-tête, bandeau de secours, tableau. Utilisé par la page IPSW
+/// et par les favoris.
+struct IPSWFirmwarePanel: View {
+    let device: IPSWDevice
+    let model: IPSWModel
+    let downloads: DownloadManager
+
+    private var favorite: Favorite { .of(device) }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(device.name).font(.headline)
+                    if device.name != device.identifier {
+                        Text(device.identifier).font(.caption.monospaced()).foregroundStyle(.secondary)
+                    }
+                }
+                Button {
+                    FavoritesStore.shared.toggle(favorite)
+                } label: {
+                    Image(systemName: FavoritesStore.shared.contains(favorite) ? "star.fill" : "star")
+                        .foregroundStyle(FavoritesStore.shared.contains(favorite) ? Color.yellow : Color.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help(favoriteMenuTitle(favorite))
+                Spacer()
+                Toggle(tr("Signés uniquement", "Signed only"), isOn: Binding(model, \.signedOnly))
+                    .toggleStyle(.checkbox)
+                Button {
+                    model.loadFirmwares(device.identifier, force: true)
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .help(tr("Recharger", "Reload"))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+
+            if let banner = fallbackBanner(model.firmwareSources[device.identifier]) {
+                banner
+            }
+            Divider()
+            IPSWFirmwareTable(firmwares: rows(for: device),
+                              device: device,
+                              downloads: downloads,
+                              selection: Binding(model, \.firmwareSelection),
+                              sortOrder: Binding(model, \.sortOrder))
+                .frame(maxHeight: .infinity)
+                .overlay { firmwareOverlay(device) }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { model.loadFirmwares(device.identifier, force: false) }
     }
 
     /// Bandeau affiché quand ipsw.me n'a pas répondu.
@@ -521,49 +597,6 @@ struct IPSWPane: View {
         }
     }
 
-    private var icon: String {
-        switch family {
-        case .iPhone: "iphone"
-        case .iPad: "ipad"
-        case .mac: "laptopcomputer"
-        }
-    }
-
-    private var footer: some View {
-        HStack(spacing: 6) {
-            sourceLabel
-            Spacer()
-            Button {
-                NSWorkspace.shared.open(downloads.destinationFolder)
-            } label: {
-                Label(downloads.destinationFolder.lastPathComponent, systemImage: "folder")
-            }
-            .buttonStyle(.borderless)
-            .help(downloads.destinationFolder.path)
-        }
-        .font(.callout)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(.bar)
-    }
-
-    @ViewBuilder
-    private var sourceLabel: some View {
-        switch model.devicesSource {
-        case .cache?:
-            Label(tr("Source : ipsw.me (hors ligne, cache)", "Source: ipsw.me (offline, cached)"),
-                  systemImage: "wifi.slash")
-                .foregroundStyle(.orange)
-        case .apple?:
-            Label(tr("Source : Apple (secours)", "Source: Apple (fallback)"), systemImage: "applelogo")
-                .foregroundStyle(.orange)
-        default:
-            HStack(spacing: 4) {
-                Text(tr("Source :", "Source:")).foregroundStyle(.secondary)
-                Link("ipsw.me", destination: URL(string: "https://ipsw.me")!)
-            }
-        }
-    }
 }
 
 struct IPSWFirmwareTable: View {

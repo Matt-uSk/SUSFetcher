@@ -20,6 +20,7 @@ Native macOS app (Swift/SwiftUI, Apple Silicon, macOS 14+, zero dependencies) th
 - “Other” products: package menu, saved into `<Title> <version> [<Product ID>]/`
 - Channels: Public, Public beta, Developer beta, AppleSeed — beta-only products get a BETA badge, “Betas only” filter
 - Search by title / version / build / Product ID
+- **Favorites** section in the sidebar for quick access to a macOS line (e.g. “macOS Tahoe”, always up to date) or an iPhone / iPad / Mac model
 - **Firmwares (IPSW)** for iPhone, iPad and Apple Silicon Macs, based on [ipsw.me](https://ipsw.me): models list, versions with Apple signing status, “Signed only” filter, one-click download into `IPSW/` with **automatic checksum verification**. If ipsw.me is unreachable, the app falls back to its last saved copy, then to Apple's official restore lists (latest signed version)
 - Metadata (.dist) cached in `~/Library/Application Support/SUSFetcher/`
 
