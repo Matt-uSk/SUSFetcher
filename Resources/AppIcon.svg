@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#4C8DFF"/>
+      <stop offset="0.55" stop-color="#3B4FE0"/>
+      <stop offset="1" stop-color="#2A1E9C"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.38" r="0.45">
+      <stop offset="0" stop-color="#9FD0FF" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#9FD0FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.28"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="left" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DCE3FF"/>
+    </linearGradient>
+    <linearGradient id="right" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#B9C4FF"/>
+      <stop offset="1" stop-color="#8E9CF2"/>
+    </linearGradient>
+    <linearGradient id="inside" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#141A5C"/>
+      <stop offset="1" stop-color="#28308A"/>
+    </linearGradient>
+    <linearGradient id="flapL" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#C9D2FF"/>
+      <stop offset="1" stop-color="#EEF1FF"/>
+    </linearGradient>
+    <linearGradient id="flapR" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#9AA8F5"/>
+      <stop offset="1" stop-color="#C4CDFF"/>
+    </linearGradient>
+    <linearGradient id="arrow" gradientUnits="userSpaceOnUse" x1="0" y1="170" x2="0" y2="580">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#7FF0C8"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="18"/>
+      <feOffset dy="16"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="iconShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="14"/>
+      <feOffset dy="10"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="squircle"><rect x="100" y="100" width="824" height="824" rx="186"/></clipPath>
+  </defs>
+
+  <!-- Fond -->
+  <g filter="url(#iconShadow)">
+    <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#bg)"/>
+  </g>
+  <g clip-path="url(#squircle)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#glow)"/>
+    <rect x="100" y="100" width="824" height="824" fill="url(#sheen)"/>
+    <!-- ombre au sol -->
+    <ellipse cx="512" cy="840" rx="250" ry="40" fill="#0B0F4A" opacity="0.35"/>
+  </g>
+  <rect x="101.5" y="101.5" width="821" height="821" rx="185" fill="none" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="3"/>
+
+  <g filter="url(#shadow)">
+    <!-- rabats arrière -->
+    <polygon points="312,540 512,440 470,368 270,468" fill="url(#flapL)"/>
+    <polygon points="512,440 712,540 754,468 554,368" fill="url(#flapR)"/>
+    <!-- intérieur -->
+    <polygon points="512,440 712,540 512,640 312,540" fill="url(#inside)"/>
+
+    <!-- flèche -->
+    <g>
+      <rect x="464" y="170" width="96" height="290" rx="20" fill="url(#arrow)"/>
+      <path d="M 382 420 Q 372 420 380 430 L 500 568 Q 512 582 524 568 L 644 430 Q 652 420 642 420 Z" fill="url(#arrow)"/>
+    </g>
+
+    <!-- faces avant -->
+    <polygon points="312,540 512,640 512,830 312,730" fill="url(#left)"/>
+    <polygon points="512,640 712,540 712,730 512,830" fill="url(#right)"/>
+    <!-- arêtes -->
+    <polyline points="312,540 512,640 712,540" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linejoin="round" opacity="0.9"/>
+    <line x1="512" y1="640" x2="512" y2="830" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="3"/>
+  </g>
+</svg>
