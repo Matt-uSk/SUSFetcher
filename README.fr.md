@@ -20,7 +20,7 @@ App macOS native (Swift/SwiftUI, Apple Silicon, macOS 14+, sans aucune dépendan
 - Produits « Autres » : menu des paquets, rangés dans `<Titre> <version> [<Product ID>]/`
 - Canaux : Public, Bêta publique, Bêta développeur, AppleSeed — produits bêta marqués BÊTA, filtre « Bêtas uniquement »
 - Recherche par titre / version / build / Product ID
-- Section **Favoris** dans la sidebar pour retrouver vite une version de macOS (ex. « macOS Tahoe », toujours à jour) ou un modèle d'iPhone / iPad / Mac
+- **Collections** : tes propres sections dans la sidebar, renommables et réordonnables, pour regrouper des versions de macOS (ex. « macOS Tahoe », toujours à jour) et des modèles d'iPhone / iPad / Mac
 - **Firmwares (IPSW)** iPhone, iPad et Mac Apple Silicon, basés sur [ipsw.me](https://ipsw.me) : liste des modèles, versions avec statut de signature Apple, filtre « Signés uniquement », téléchargement en un clic dans `IPSW/` avec **vérification d'empreinte automatique**. Si ipsw.me ne répond pas, l'app utilise sa dernière copie enregistrée, puis les listes de restauration officielles d'Apple (dernière version signée)
 - Métadonnées (.dist) mises en cache dans `~/Library/Application Support/SUSFetcher/`
 

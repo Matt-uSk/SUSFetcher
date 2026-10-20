@@ -401,12 +401,12 @@ struct IPSWPane: View {
                         }
                     }
                     Spacer(minLength: 4)
-                    if FavoritesStore.shared.contains(.of(d)) { FavoriteStar() }
+                    if CollectionsStore.shared.isInAnyCollection(.of(d)) { CollectionMark() }
                 }
                 .padding(.vertical, 2)
                 .tag(d.identifier)
                 .contextMenu {
-                    Button(favoriteMenuTitle(.of(d))) { FavoritesStore.shared.toggle(.of(d)) }
+                    AddToCollectionMenu(favorite: .of(d))
                 }
             }
         }
@@ -507,14 +507,15 @@ struct IPSWFirmwarePanel: View {
                         Text(device.identifier).font(.caption.monospaced()).foregroundStyle(.secondary)
                     }
                 }
-                Button {
-                    FavoritesStore.shared.toggle(favorite)
+                Menu {
+                    AddToCollectionItems(favorite: favorite)
                 } label: {
-                    Image(systemName: FavoritesStore.shared.contains(favorite) ? "star.fill" : "star")
-                        .foregroundStyle(FavoritesStore.shared.contains(favorite) ? Color.yellow : Color.secondary)
+                    Image(systemName: CollectionsStore.shared.isInAnyCollection(favorite) ? "folder.fill" : "folder.badge.plus")
                 }
-                .buttonStyle(.borderless)
-                .help(favoriteMenuTitle(favorite))
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help(tr("Ajouter à une collection", "Add to Collection"))
                 Spacer()
                 Toggle(tr("Signés uniquement", "Signed only"), isOn: Binding(model, \.signedOnly))
                     .toggleStyle(.checkbox)

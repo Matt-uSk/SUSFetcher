@@ -34,6 +34,9 @@ struct SUSFetcherApp: App {
                 Divider()
             }
             CommandGroup(after: .newItem) {
+                Button(tr("Nouvelle collection…", "New Collection…")) { CollectionsStore.shared.createInteractively() }
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
+                Divider()
                 Button(tr("Recharger le catalogue", "Reload catalog")) { catalog.reload() }
                     .keyboardShortcut("r")
                 Button(tr("Vider le cache des métadonnées", "Clear metadata cache")) { catalog.clearCacheAndReload() }

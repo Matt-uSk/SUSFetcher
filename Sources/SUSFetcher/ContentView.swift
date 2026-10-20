@@ -3,7 +3,7 @@ import SwiftUI
 
 enum SidebarItem: Identifiable, Hashable {
     case installers, others, iphone, ipad, mac, downloads
-    case favorite(String)       // id du favori (cf. Favorite.id)
+    case collectionItem(UUID, String)   // (collection, Favorite.id)
 
     var id: String {
         switch self {
@@ -13,7 +13,7 @@ enum SidebarItem: Identifiable, Hashable {
         case .ipad: "ipad"
         case .mac: "mac"
         case .downloads: "downloads"
-        case .favorite(let id): "favorite:\(id)"
+        case .collectionItem(let c, let f): "collection:\(c.uuidString):\(f)"
         }
     }
 
@@ -24,8 +24,8 @@ enum SidebarItem: Identifiable, Hashable {
     @MainActor var isCatalog: Bool {
         switch self {
         case .installers, .others: true
-        case .favorite(let id):
-            if case .catalog? = FavoritesStore.shared.item(id) { true } else { false }
+        case .collectionItem(_, let fid):
+            if case .catalog? = CollectionsStore.shared.favorite(fid) { true } else { false }
         default: false
         }
     }
@@ -47,13 +47,13 @@ enum SidebarItem: Identifiable, Hashable {
         case .iphone: "iPhone"
         case .ipad: "iPad"
         case .mac: tr("Mac (Apple Silicon)", "Mac (Apple Silicon)")
-        case .favorite(let id): FavoritesStore.shared.item(id)?.label ?? ""
+        case .collectionItem(_, let fid): CollectionsStore.shared.favorite(fid)?.label ?? ""
         }
     }
 
     @MainActor var icon: String {
         switch self {
-        case .favorite(let id): FavoritesStore.shared.item(id)?.icon ?? "star"
+        case .collectionItem(_, let fid): CollectionsStore.shared.favorite(fid)?.icon ?? "folder"
         case .installers: "laptopcomputer.and.arrow.down"
         case .others: "shippingbox"
         case .downloads: "arrow.down.circle"
@@ -96,7 +96,7 @@ struct ContentView: View {
     let state: ViewState
 
     private var sidebar: SidebarItem? { state.sidebar }
-    private var favorites: FavoritesStore { FavoritesStore.shared }
+    private var collections: CollectionsStore { CollectionsStore.shared }
     private var search: String { state.search }
     private var sortOrder: [KeyPathComparator<SUProduct>] { state.sortOrder }
 
@@ -120,20 +120,10 @@ struct ContentView: View {
 
     private var sidebarList: some View {
         List(selection: Binding(state, \.sidebar)) {
-            if !favorites.items.isEmpty {
-                Section(tr("Favoris", "Favorites")) {
-                    ForEach(favorites.items) { fav in
-                        Label(fav.label, systemImage: fav.icon)
-                            .lineLimit(1)
-                            .tag(SidebarItem.favorite(fav.id))
-                            .contextMenu {
-                                Button(tr("Retirer des favoris", "Remove from Favorites")) {
-                                    favorites.remove(fav.id)
-                                }
-                            }
-                    }
-                    .onMove { favorites.move(fromOffsets: $0, toOffset: $1) }
-                }
+            ForEach(Array(collections.collections.enumerated()), id: \.element.id) { index, c in
+                CollectionSection(collection: c,
+                                  isFirst: index == 0,
+                                  isLast: index == collections.collections.count - 1)
             }
             Section(tr("Catalogue", "Catalog")) {
                 ForEach(SidebarItem.catalogItems) { item in
@@ -153,7 +143,19 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            SidebarDownloadsMonitor(downloads: downloads) { state.showDownloads() }
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    collections.createInteractively()
+                } label: {
+                    Label(tr("Nouvelle collection", "New Collection"), systemImage: "plus")
+                        .font(.callout)
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                SidebarDownloadsMonitor(downloads: downloads) { state.showDownloads() }
+            }
         }
         .navigationSplitViewColumnWidth(min: 200, ideal: 230)
     }
@@ -165,8 +167,8 @@ struct ContentView: View {
         } else if let family = sidebar?.ipswFamily {
             IPSWPane(family: family, model: IPSWModel.shared, downloads: downloads, search: search)
                 .id(family)
-        } else if case .favorite(let id)? = sidebar {
-            favoriteDetail(id)
+        } else if case .collectionItem(_, let fid)? = sidebar {
+            favoriteDetail(fid)
         } else {
             catalogDetail(rows)
         }
@@ -174,7 +176,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private func favoriteDetail(_ id: String) -> some View {
-        switch favorites.item(id) {
+        switch collections.favorite(id) {
         case .catalog(let title, _)?:
             catalogDetail(filtered(visible(catalog.products).filter { $0.displayTitle == title }))
         case .device(let identifier, let name)?:
@@ -278,7 +280,7 @@ struct ContentView: View {
         case .installers: visible(catalog.installers).count
         case .others: visible(catalog.others).count
         case .downloads: downloads.pendingCount
-        case .favorite: 0
+        case .collectionItem: 0
         case .iphone, .ipad, .mac:
             item.ipswFamily.map { IPSWModel.shared.count($0) } ?? 0
         }
@@ -309,7 +311,7 @@ struct ContentView: View {
             } actions: {
                 Button(tr("Tout afficher", "Show all")) { state.betaOnly = false }
             }
-        } else if rows.isEmpty, case .favorite? = sidebar, !catalog.isLoading {
+        } else if rows.isEmpty, case .collectionItem? = sidebar, !catalog.isLoading {
             ContentUnavailableView(tr("Rien pour ce favori dans ce catalogue", "Nothing for this favorite in this catalog"),
                                    systemImage: "star.slash",
                                    description: Text(tr("Apple a peut-être retiré ce produit, ou le canal choisi ne le contient pas.",
@@ -354,7 +356,7 @@ struct ProductTable: View {
                     Text(p.displayTitle)
                         .foregroundStyle(p.metadataLoaded ? HierarchicalShapeStyle.primary : HierarchicalShapeStyle.secondary)
                     if p.isBeta { BetaBadge() }
-                    if FavoritesStore.shared.contains(.of(p)) { FavoriteStar() }
+                    if CollectionsStore.shared.isInAnyCollection(.of(p)) { CollectionMark() }
                 }
             }
             .width(min: 180, ideal: 240)
@@ -409,7 +411,7 @@ struct ProductTable: View {
                 Button(tr("Tous les paquets", "All packages")) { downloads.downloadAll(of: p) }
             }
             Divider()
-            Button(favoriteMenuTitle(.of(p))) { FavoritesStore.shared.toggle(.of(p)) }
+            AddToCollectionMenu(favorite: .of(p))
             Divider()
             Button(tr("Copier le Product ID", "Copy Product ID")) { copy(p.id) }
             if let ia = p.installAssistant {

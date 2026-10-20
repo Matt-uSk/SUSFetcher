@@ -5,9 +5,11 @@ All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://k
 ## [1.4.0] - 2026-10-20
 
 ### Added
-- **Favorites**: right-click a catalog product or an IPSW model → “Add to Favorites”, or use the ☆ button next to a model's name. Favorites appear in their own section at the top of the sidebar, can be reordered by drag and drop and removed with a right-click.
-- Catalog favorites follow the product **title** (e.g. “macOS Tahoe”), so they always show every version, including future ones; IPSW favorites follow the model identifier.
-- Favorited items show a ★ in the lists.
+- **Collections**: create your own collections (e.g. “Fleet”, “Beta testing”), rename, reorder and delete them. Each collection is a section in the sidebar.
+- Right-click a catalog product or an IPSW model → **Add to Collection ›** (checkmarks per collection, or “New Collection…”); the folder button next to a model's name does the same.
+- Items can be reordered by drag and drop and removed with a right-click; one item can live in several collections.
+- Catalog items follow the product **title** (e.g. “macOS Tahoe”), so they always show every version, including future ones; IPSW items follow the model identifier.
+- “New Collection…” in the File menu (⇧⌘N) and at the bottom of the sidebar.
 
 ## [1.3.0] - 2026-10-20
 
