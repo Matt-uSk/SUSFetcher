@@ -1,9 +1,10 @@
 name: Build
 
-# Compile on every push / pull request (no release).
+# Compile on every push to a working branch / pull request (no release).
+# main is skipped: the Release workflow builds it anyway, and macOS runners are scarce.
 on:
   push:
-    branches: ["**"]
+    branches-ignore: ["main"]
   pull_request:
 
 jobs:
