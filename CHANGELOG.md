@@ -2,6 +2,14 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.4.1] - 2026-10-20
+
+### Added
+- Sort menu above the IPSW model list: newest first, oldest first, name (A → Z), or **by product line** (grouped in sections: MacBook Pro, iMac, Mac mini…). The choice is remembered.
+
+### Fixed
+- Mac models were in the wrong order: M1-era identifiers (iMac21, MacBookPro18, Macmini9…) were listed before newer Macs. They are now placed in their generation, before Mac13 and later.
+
 ## [1.4.0] - 2026-10-20
 
 ### Added

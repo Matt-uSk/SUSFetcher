@@ -30,6 +30,41 @@ struct IPSWDevice: Identifiable, Hashable, Codable, Sendable {
         let parts = digits.split(separator: ",")
         return (Int(parts.first ?? "") ?? 0, Int(parts.dropFirst().first ?? "") ?? 0)
     }
+
+    /// Préfixe de l'identifiant : "iPhone", "iPad", "Mac", "MacBookPro", "iMac", "VirtualMac"…
+    var identifierPrefix: String { String(identifier.prefix { !$0.isNumber }) }
+
+    /// Clé chronologique comparable entre toutes les gammes.
+    /// Les Mac M1 ont des identifiants historiques (MacBookAir10, Macmini9, MacBookPro17/18, iMac21) :
+    /// ils sont rangés avant Mac13 (Mac Studio 2022, puis M2, M3…). VirtualMac est placé en dernier.
+    var chronology: (Int, Int, Int) {
+        let (major, minor) = generation
+        switch identifierPrefix {
+        case "iPhone", "iPad", "Mac": return (major, major, minor)
+        case "VirtualMac": return (0, major, minor)
+        default: return (12, major, minor)   // anciens identifiants Mac (génération M1)
+        }
+    }
+
+    /// Gamme lisible, pour le regroupement : « MacBook Pro », « iMac 24-inch », « iPhone 17 Pro »…
+    var productLine: String {
+        let base = name.components(separatedBy: " (").first ?? name
+        return base.trimmingCharacters(in: .whitespaces)
+    }
+}
+
+enum IPSWDeviceSort: String, CaseIterable, Identifiable {
+    case newest, oldest, name, line
+    var id: String { rawValue }
+
+    @MainActor var label: String {
+        switch self {
+        case .newest: tr("Plus récents d'abord", "Newest first")
+        case .oldest: tr("Plus anciens d'abord", "Oldest first")
+        case .name: tr("Nom (A → Z)", "Name (A → Z)")
+        case .line: tr("Par gamme", "By product line")
+        }
+    }
 }
 
 struct IPSWFirmware: Identifiable, Hashable, Codable, Sendable {
@@ -297,18 +332,31 @@ final class IPSWModel {
     var signedOnly = false
     var firmwareSelection = Set<IPSWFirmware.ID>()
     var sortOrder = [KeyPathComparator(\IPSWFirmware.sortDate, order: .reverse)]
+    var deviceSort: IPSWDeviceSort =
+        UserDefaults.standard.string(forKey: "ipswDeviceSort").flatMap(IPSWDeviceSort.init(rawValue:)) ?? .newest {
+        didSet { UserDefaults.standard.set(deviceSort.rawValue, forKey: "ipswDeviceSort") }
+    }
 
     @ObservationIgnored private let service = IPSWService()
 
-    /// Plus récent d'abord : iPhone18,3 avant iPhone18,1 avant iPhone17,5…
+    /// Appareils d'une famille, triés selon `deviceSort`.
     func devices(in family: IPSWFamily) -> [IPSWDevice] {
-        devices.filter { family.matches($0.identifier) }
-            .sorted { a, b in
-                let (ga, gb) = (a.generation, b.generation)
-                if ga.0 != gb.0 { return ga.0 > gb.0 }
-                if ga.1 != gb.1 { return ga.1 > gb.1 }
-                return a.name.localizedStandardCompare(b.name) == .orderedAscending
+        let list = devices.filter { family.matches($0.identifier) }
+        func newer(_ a: IPSWDevice, _ b: IPSWDevice) -> Bool {
+            let (ca, cb) = (a.chronology, b.chronology)
+            if ca != cb { return ca > cb }
+            return a.name.localizedStandardCompare(b.name) == .orderedAscending
+        }
+        switch deviceSort {
+        case .newest: return list.sorted(by: newer)
+        case .oldest: return list.sorted { newer($1, $0) }
+        case .name: return list.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        case .line:
+            return list.sorted { a, b in
+                let order = a.productLine.localizedStandardCompare(b.productLine)
+                return order == .orderedSame ? newer(a, b) : order == .orderedAscending
             }
+        }
     }
 
     func count(_ family: IPSWFamily) -> Int { devices.filter { family.matches($0.identifier) }.count }
@@ -391,23 +439,43 @@ struct IPSWPane: View {
     // Colonne appareils
 
     private var devicesColumn: some View {
-        List(selection: Binding(get: { selectedID }, set: { model.select($0, in: family) })) {
-            ForEach(deviceList) { d in
-                HStack {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(d.name).lineLimit(1)
-                        if d.name != d.identifier {
-                            Text(d.identifier).font(.caption.monospaced()).foregroundStyle(.secondary)
-                        }
+        VStack(spacing: 0) {
+            HStack {
+                Text(tr("\(deviceList.count) modèles", "\(deviceList.count) models"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Menu {
+                    Picker(tr("Trier", "Sort"), selection: Binding(model, \.deviceSort)) {
+                        ForEach(IPSWDeviceSort.allCases) { Text($0.label).tag($0) }
                     }
-                    Spacer(minLength: 4)
-                    if CollectionsStore.shared.isInAnyCollection(.of(d)) { CollectionMark() }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                } label: {
+                    Label(model.deviceSort.label, systemImage: "arrow.up.arrow.down")
+                        .font(.caption)
                 }
-                .padding(.vertical, 2)
-                .tag(d.identifier)
-                .contextMenu {
-                    AddToCollectionMenu(favorite: .of(d))
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help(tr("Ordre des modèles", "Model order"))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            Divider()
+            deviceListView
+        }
+    }
+
+    private var deviceListView: some View {
+        List(selection: Binding(get: { selectedID }, set: { model.select($0, in: family) })) {
+            if model.deviceSort == .line {
+                ForEach(groupedByLine, id: \.line) { group in
+                    Section(group.line) {
+                        ForEach(group.devices) { deviceRow($0) }
+                    }
                 }
+            } else {
+                ForEach(deviceList) { deviceRow($0) }
             }
         }
         .listStyle(.sidebar)
@@ -426,6 +494,38 @@ struct IPSWPane: View {
                 ContentUnavailableView.search(text: search)
             }
         }
+    }
+
+    /// Ligne d'appareil (nom, identifiant, marque de collection, menu contextuel).
+    private func deviceRow(_ d: IPSWDevice) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(d.name).lineLimit(1)
+                if d.name != d.identifier {
+                    Text(d.identifier).font(.caption.monospaced()).foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 4)
+            if CollectionsStore.shared.isInAnyCollection(.of(d)) { CollectionMark() }
+        }
+        .padding(.vertical, 2)
+        .tag(d.identifier)
+        .contextMenu {
+            AddToCollectionMenu(favorite: .of(d))
+        }
+    }
+
+    /// Regroupement par gamme (l'ordre interne reste « plus récent d'abord »).
+    private var groupedByLine: [(line: String, devices: [IPSWDevice])] {
+        var groups: [(line: String, devices: [IPSWDevice])] = []
+        for d in deviceList {
+            if let i = groups.firstIndex(where: { $0.line == d.productLine }) {
+                groups[i].devices.append(d)
+            } else {
+                groups.append((d.productLine, [d]))
+            }
+        }
+        return groups
     }
 
     // Colonne firmwares
