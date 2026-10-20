@@ -1,0 +1,59 @@
+name: Release
+
+# Pousser un tag vX.Y.Z construit SUS Fetcher.app sur un Mac Apple Silicon
+# et l'attache à la Release GitHub correspondante.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest   # runner Apple Silicon
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          sw_vers
+          swift --version
+
+      - name: Build
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: ./build-app.sh "${GITHUB_REF_NAME}"
+
+      - name: Package
+        run: |
+          cd build
+          ditto -c -k --sequesterRsrc --keepParent "SUS Fetcher.app" "SUS-Fetcher-${GITHUB_REF_NAME}.zip"
+          shasum -a 256 "SUS-Fetcher-${GITHUB_REF_NAME}.zip" | tee "SUS-Fetcher-${GITHUB_REF_NAME}.zip.sha256"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ZIP="build/SUS-Fetcher-${GITHUB_REF_NAME}.zip"
+          NOTES=$(cat <<'MD'
+          ## Installation
+
+          1. Télécharger `SUS-Fetcher-*.zip`, le décompresser et glisser **SUS Fetcher.app** dans `/Applications`.
+          2. L'app est signée ad-hoc (pas de Developer ID) : au premier lancement, macOS la bloque.
+             Retirer la quarantaine une fois :
+
+             ```bash
+             xattr -dr com.apple.quarantine "/Applications/SUS Fetcher.app"
+             ```
+
+          Apple Silicon, macOS 14 ou plus récent.
+          MD
+          )
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$ZIP" "$ZIP.sha256" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$ZIP" "$ZIP.sha256" \
+              --title "SUS Fetcher ${GITHUB_REF_NAME}" \
+              --notes "$NOTES"
+          fi

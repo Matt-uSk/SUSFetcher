@@ -37,11 +37,23 @@ App macOS native (Swift/SwiftUI, Apple Silicon, macOS 14+, sans aucune dépendan
 Jetons du modèle personnalisé : `{name}` (titre sans espaces), `{title}`, `{version}`, `{build}`, `{id}`.
 Un jeton vide est supprimé avec son séparateur.
 
-## Build
+## Installation
+
+Télécharger la dernière version dans les [Releases](https://github.com/Matt-uSk/SUSFetcher/releases), décompresser et glisser **SUS Fetcher.app** dans `/Applications`.
+
+L'app est signée ad-hoc (pas de Developer ID Apple) : au premier lancement macOS la bloque. Retirer la quarantaine une fois :
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/SUS Fetcher.app"
+```
+
+Apple Silicon, macOS 14 ou plus récent.
+
+## Build depuis les sources
 
 ```bash
 chmod +x build-app.sh
-./build-app.sh            # → build/SUS Fetcher.app
+./build-app.sh 1.0.0      # → build/SUS Fetcher.app
 ```
 
 Ou pour tester rapidement : `swift run`. Ou `open Package.swift` pour l'ouvrir dans Xcode.
@@ -49,3 +61,16 @@ Ou pour tester rapidement : `swift run`. Ou `open Package.swift` pour l'ouvrir d
 ## Nouvelle version majeure de macOS
 
 Dans `Sources/SUSFetcher/Models.swift`, ajouter le numéro en tête de `CatalogChannel.versions` (ex. `28-27-26-…`) et mettre à jour `latestMajor`.
+
+## Publier une version
+
+Pousser un tag : la GitHub Action [`release.yml`](.github/workflows/release.yml) compile l'app sur un Mac Apple Silicon et l'attache à la Release.
+
+```bash
+git tag v1.1.0 && git push origin v1.1.0
+```
+
+## Licence
+
+[MIT](LICENSE) — fais-en ce que tu veux.
+
