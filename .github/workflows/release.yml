@@ -1,36 +1,68 @@
 name: Release
 
 # Builds SUS Fetcher.app on an Apple Silicon Mac and attaches it to a GitHub Release.
-# Two triggers:
+# Release notes = the matching section of CHANGELOG.md + installation instructions.
+# Triggers:
 #  - push a vX.Y.Z tag
 #  - Actions > Release > "Run workflow", entering the version (creates the tag and the Release)
+#    Tick "notes only" to just refresh the release notes from CHANGELOG.md (no rebuild).
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to publish (e.g. v1.1.0)"
+        description: "Version to publish (e.g. v1.3.0)"
         required: true
         default: "v1.0.0"
+      notes_only:
+        description: "Only update the release notes from CHANGELOG.md (no build)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
 jobs:
-  build:
-    runs-on: macos-latest   # runner Apple Silicon
+  release:
+    runs-on: macos-latest   # Apple Silicon runner
     env:
       TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+      NOTES_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.notes_only || false }}
     steps:
       - uses: actions/checkout@v5
 
-      - name: Toolchain
+      - name: Release notes
         run: |
-          sw_vers
-          swift --version
+          VER="${TAG#v}"
+          # Section "## [VER]" of CHANGELOG.md, up to the next "## [" heading
+          awk -v ver="$VER" '
+            /^## \[/ { if (found) exit; if (index($0, "## [" ver "]") == 1) { found=1; next } }
+            found { print }
+          ' CHANGELOG.md > changes.md
+          if [ ! -s changes.md ]; then
+            echo "::warning::No CHANGELOG.md section for $VER"
+            echo "_See [CHANGELOG.md](https://github.com/Matt-uSk/SUSFetcher/blob/main/CHANGELOG.md)._" > changes.md
+          fi
+          {
+            echo "## What's new"
+            cat changes.md
+            echo
+            echo "## Installation"
+            echo
+            echo '1. Download `SUS-Fetcher-'"$TAG"'.zip`, unzip it and drag **SUS Fetcher.app** into `/Applications`.'
+            echo '2. The app is ad-hoc signed (no Developer ID), so macOS blocks it on first launch. Remove the quarantine flag once:'
+            echo
+            echo '   ```bash'
+            echo '   xattr -dr com.apple.quarantine "/Applications/SUS Fetcher.app"'
+            echo '   ```'
+            echo
+            echo 'Apple Silicon, macOS 14 or later. — 🇫🇷 [Instructions en français](https://github.com/Matt-uSk/SUSFetcher/blob/main/README.fr.md#installation)'
+          } > notes.md
+          cat notes.md
 
       - name: Build
+        if: env.NOTES_ONLY != 'true'
         env:
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
@@ -42,6 +74,7 @@ jobs:
           fi
 
       - name: Package
+        if: env.NOTES_ONLY != 'true'
         run: |
           cd build
           ditto -c -k --sequesterRsrc --keepParent "SUS Fetcher.app" "SUS-Fetcher-${TAG}.zip"
@@ -52,21 +85,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ZIP="build/SUS-Fetcher-${TAG}.zip"
-          cat > notes.md <<'MD'
-          ## Installation
-
-          1. Download `SUS-Fetcher-*.zip`, unzip it and drag **SUS Fetcher.app** into `/Applications`.
-          2. The app is ad-hoc signed (no Developer ID), so macOS blocks it on first launch.
-             Remove the quarantine flag once:
-
-             ```bash
-             xattr -dr com.apple.quarantine "/Applications/SUS Fetcher.app"
-             ```
-
-          Apple Silicon, macOS 14 or later. — 🇫🇷 [Instructions en français](https://github.com/Matt-uSk/SUSFetcher/blob/main/README.fr.md#installation)
-          MD
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$ZIP" "$ZIP.sha256" --clobber
+            gh release edit "$TAG" --notes-file notes.md
+            if [ "$NOTES_ONLY" != "true" ]; then
+              gh release upload "$TAG" "$ZIP" "$ZIP.sha256" --clobber
+            fi
+          elif [ "$NOTES_ONLY" = "true" ]; then
+            echo "::error::Release $TAG does not exist (notes only)"; exit 1
           else
             gh release create "$TAG" "$ZIP" "$ZIP.sha256" \
               --target "$GITHUB_SHA" \

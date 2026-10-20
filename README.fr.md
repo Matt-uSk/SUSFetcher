@@ -68,6 +68,10 @@ Rien à modifier ni à recompiler. Au lancement, SUS Fetcher détecte la derniè
 
 Le catalogue public contient de toute façon les nouveaux installers (Apple les ajoute aussi aux anciens catalogues) ; la détection sert surtout aux canaux bêta, dont l'URL inclut le numéro de version. En dépannage, une URL de catalogue personnalisée peut être saisie dans les réglages.
 
+## Historique des versions
+
+Voir [CHANGELOG.md](CHANGELOG.md) (en anglais).
+
 ## Licence
 
 [MIT](LICENSE) — fais-en ce que tu veux.
