@@ -23,8 +23,14 @@ struct SUSFetcherApp: App {
                     .keyboardShortcut("1")
                 Button(tr("Autres", "Other")) { viewState.sidebar = .others }
                     .keyboardShortcut("2")
-                Button(tr("Téléchargements", "Downloads")) { viewState.showDownloads() }
+                Button("iPhone (IPSW)") { viewState.sidebar = .iphone }
                     .keyboardShortcut("3")
+                Button("iPad (IPSW)") { viewState.sidebar = .ipad }
+                    .keyboardShortcut("4")
+                Button("Mac (IPSW)") { viewState.sidebar = .mac }
+                    .keyboardShortcut("5")
+                Button(tr("Téléchargements", "Downloads")) { viewState.showDownloads() }
+                    .keyboardShortcut("6")
                 Divider()
             }
             CommandGroup(after: .newItem) {

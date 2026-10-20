@@ -13,13 +13,14 @@ App macOS native (Swift/SwiftUI, Apple Silicon, macOS 14+, sans aucune dépendan
 
 ## Fonctions
 
-- Sidebar **Installers macOS** / **Autres** / **Téléchargements** (⌘1 / ⌘2 / ⌘3)
+- Sidebar **Installers macOS** / **Autres** / **iPhone** / **iPad** / **Mac** / **Téléchargements** (⌘1 … ⌘6)
 - Bouton « InstallAssistant.pkg » par ligne, double-clic, multi-sélection (clic droit)
 - Page Téléchargements + mini-moniteur en bas de la sidebar : progression, vitesse, temps restant, **pause / reprise**, annulation, réessai
 - Confirmation avant de quitter si des téléchargements sont en cours
 - Produits « Autres » : menu des paquets, rangés dans `<Titre> <version> [<Product ID>]/`
 - Canaux : Public, Bêta publique, Bêta développeur, AppleSeed — produits bêta marqués BÊTA, filtre « Bêtas uniquement »
 - Recherche par titre / version / build / Product ID
+- **Firmwares (IPSW)** iPhone, iPad et Mac Apple Silicon, basés sur [ipsw.me](https://ipsw.me) : liste des modèles, versions avec statut de signature Apple, filtre « Signés uniquement », téléchargement en un clic dans `IPSW/` avec **vérification SHA-256 automatique**
 - Métadonnées (.dist) mises en cache dans `~/Library/Application Support/SUSFetcher/`
 
 ## Réglages (⌘,)

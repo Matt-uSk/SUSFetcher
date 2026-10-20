@@ -1,4 +1,5 @@
 import AppKit
+import CryptoKit
 import Foundation
 import Observation
 
@@ -52,6 +53,16 @@ struct DownloadItem: Identifiable, Equatable {
     let expectedSize: Int64
     let createdAt: Date
     var state: State
+    /// SHA-256 attendu (IPSW) : vérifié automatiquement à la fin du téléchargement.
+    var sha256: String? = nil
+    var verification: Verification? = nil
+
+    enum Verification: Equatable {
+        case running
+        case ok
+        case mismatch
+        case error(String)
+    }
 
     var id: URL { source }
     var fileName: String { destination.lastPathComponent }
@@ -177,7 +188,13 @@ final class DownloadManager {
     func retry(_ url: URL) {
         guard let item = item(url), case .failed = item.state else { return }
         items.removeAll { $0.source == url }
-        start(SUPackage(url: url, size: item.expectedSize), to: item.destination, title: item.title)
+        start(SUPackage(url: url, size: item.expectedSize), to: item.destination,
+              title: item.title, sha256: item.sha256)
+    }
+
+    /// Téléchargement générique (IPSW…) avec vérification SHA-256 optionnelle.
+    func download(url: URL, size: Int64, to destination: URL, title: String, sha256: String?) {
+        start(SUPackage(url: url, size: size), to: destination, title: title, sha256: sha256)
     }
 
     func remove(_ url: URL) {
@@ -199,7 +216,7 @@ final class DownloadManager {
         items[i].state = state
     }
 
-    private func start(_ pkg: SUPackage, to destination: URL, title: String) {
+    private func start(_ pkg: SUPackage, to destination: URL, title: String, sha256: String? = nil) {
         if let existing = state(of: pkg.url), !existing.isDone { return }
         items.removeAll { $0.source == pkg.url }
 
@@ -209,9 +226,36 @@ final class DownloadManager {
         items.append(DownloadItem(
             source: pkg.url, destination: destination, title: title,
             expectedSize: pkg.size, createdAt: .now,
-            state: .downloading(TransferProgress(received: 0, total: pkg.size, startedAt: .now))
+            state: .downloading(TransferProgress(received: 0, total: pkg.size, startedAt: .now)),
+            sha256: sha256?.lowercased()
         ))
         task.resume()
+    }
+
+    private func setVerification(_ url: URL, _ v: DownloadItem.Verification?) {
+        guard let i = items.firstIndex(where: { $0.source == url }) else { return }
+        items[i].verification = v
+    }
+
+    /// Calcule le SHA-256 en flux (fichiers de 10 Go+) hors du thread principal.
+    private func verify(_ source: URL, file: URL, expected: String) {
+        setVerification(source, .running)
+        Task.detached(priority: .utility) {
+            let result: DownloadItem.Verification
+            do {
+                let handle = try FileHandle(forReadingFrom: file)
+                defer { try? handle.close() }
+                var hasher = SHA256()
+                while let chunk = try handle.read(upToCount: 8 * 1024 * 1024), !chunk.isEmpty {
+                    hasher.update(data: chunk)
+                }
+                let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+                result = digest == expected ? .ok : .mismatch
+            } catch {
+                result = .error(error.localizedDescription)
+            }
+            await MainActor.run { DownloadManager.shared.setVerification(source, result) }
+        }
     }
 
     private func updateProgress(_ source: URL, _ taskID: Int, _ received: Int64, _ total: Int64) {
@@ -229,6 +273,9 @@ final class DownloadManager {
         case .success(let file):
             set(source, .finished(file))
             _ = NSApp.requestUserAttention(.informationalRequest)
+            if let expected = item(source)?.sha256, !expected.isEmpty {
+                verify(source, file: file, expected: expected)
+            }
         case .failure(let error):
             if (error as? URLError)?.code == .cancelled {
                 items.removeAll { $0.source == source }

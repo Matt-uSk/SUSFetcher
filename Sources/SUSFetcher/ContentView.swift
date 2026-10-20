@@ -2,16 +2,31 @@ import AppKit
 import SwiftUI
 
 enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
-    case installers, others, downloads
+    case installers, others, iphone, ipad, mac, downloads
     var id: String { rawValue }
 
     static let catalogItems: [SidebarItem] = [.installers, .others]
+    static let ipswItems: [SidebarItem] = [.iphone, .ipad, .mac]
+
+    var isCatalog: Bool { self == .installers || self == .others }
+
+    var ipswFamily: IPSWFamily? {
+        switch self {
+        case .iphone: .iPhone
+        case .ipad: .iPad
+        case .mac: .mac
+        default: nil
+        }
+    }
 
     @MainActor var title: String {
         switch self {
         case .installers: tr("Installers macOS", "macOS Installers")
         case .others: tr("Autres", "Other")
         case .downloads: tr("Téléchargements", "Downloads")
+        case .iphone: "iPhone"
+        case .ipad: "iPad"
+        case .mac: tr("Mac (Apple Silicon)", "Mac (Apple Silicon)")
         }
     }
 
@@ -20,6 +35,9 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         case .installers: "laptopcomputer.and.arrow.down"
         case .others: "shippingbox"
         case .downloads: "arrow.down.circle"
+        case .iphone: "iphone"
+        case .ipad: "ipad"
+        case .mac: "laptopcomputer"
         }
     }
 }
@@ -66,11 +84,12 @@ struct ContentView: View {
             detail
         }
         .searchable(text: Binding(state, \.search), placement: .toolbar,
-                    prompt: sidebar == .downloads
-                        ? tr("Nom du fichier, produit…", "File name, product…")
-                        : tr("Titre, version, build, ID…", "Title, version, build, ID…"))
+                    prompt: searchPrompt)
         .toolbar { toolbarContent }
-        .task { if catalog.products.isEmpty { catalog.reload() } }
+        .task {
+            if catalog.products.isEmpty { catalog.reload() }
+            IPSWModel.shared.loadDevicesIfNeeded()
+        }
         .onChange(of: catalog.channel) { catalog.reload() }
         .onChange(of: state.sidebar) { state.selection.removeAll() }
         .environment(\.locale, AppSettings.shared.locale)
@@ -80,6 +99,12 @@ struct ContentView: View {
         List(selection: Binding(state, \.sidebar)) {
             Section(tr("Catalogue", "Catalog")) {
                 ForEach(SidebarItem.catalogItems) { item in
+                    SidebarRow(item: item, count: count(for: item))
+                        .tag(item)
+                }
+            }
+            Section(tr("Firmwares (IPSW)", "Firmwares (IPSW)")) {
+                ForEach(SidebarItem.ipswItems) { item in
                     SidebarRow(item: item, count: count(for: item))
                         .tag(item)
                 }
@@ -99,6 +124,9 @@ struct ContentView: View {
     private var detail: some View {
         if sidebar == .downloads {
             DownloadsPane(downloads: downloads, search: search)
+        } else if let family = sidebar?.ipswFamily {
+            IPSWPane(family: family, model: IPSWModel.shared, downloads: downloads, search: search)
+                .id(family)
         } else {
             catalogDetail
         }
@@ -133,6 +161,7 @@ struct ContentView: View {
                 }
                 .menuIndicator(.visible)
                 .fixedSize()
+                .disabled(!(sidebar?.isCatalog ?? true))
                 .help(tr("Canal du catalogue Apple", "Apple catalog channel"))
             }
             ToolbarItem {
@@ -140,7 +169,7 @@ struct ContentView: View {
                     Label(tr("Bêtas uniquement", "Betas only"), systemImage: "testtube.2")
                 }
                 .toggleStyle(.button)
-                .disabled(catalog.channel == .release)
+                .disabled(catalog.channel == .release || !(sidebar?.isCatalog ?? true))
                 .help(catalog.channel == .release
                       ? tr("Choisir un canal bêta pour filtrer les bêtas", "Pick a beta channel to filter betas")
                       : tr("N'afficher que les produits absents du catalogue public",
@@ -158,6 +187,14 @@ struct ContentView: View {
                 }
                 .help(tr("Destination : ", "Destination: ") + downloads.destinationFolder.path)
             }
+    }
+
+    private var searchPrompt: String {
+        switch sidebar {
+        case .downloads?: tr("Nom du fichier, produit…", "File name, product…")
+        case .iphone?, .ipad?, .mac?: tr("Modèle ou identifiant…", "Model or identifier…")
+        default: tr("Titre, version, build, ID…", "Title, version, build, ID…")
+        }
     }
 
     /// Sur un canal bêta, ne garder (par défaut) que les produits absents du catalogue public.
@@ -183,6 +220,8 @@ struct ContentView: View {
         case .installers: visible(catalog.installers).count
         case .others: visible(catalog.others).count
         case .downloads: downloads.pendingCount
+        case .iphone, .ipad, .mac:
+            item.ipswFamily.map { IPSWModel.shared.count($0) } ?? 0
         }
     }
 

@@ -188,6 +188,7 @@ struct DownloadRow: View {
                         .tint(item.state.isPaused ? .secondary : .accentColor)
                 }
                 Text(detail).font(.caption).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
+                if let v = item.verification { VerificationBadge(verification: v) }
             }
 
             Spacer(minLength: 8)
@@ -271,4 +272,32 @@ struct DownloadRow: View {
         f.unitsStyle = .abbreviated
         return f
     }()
+}
+
+/// Résultat du contrôle SHA-256 (IPSW).
+struct VerificationBadge: View {
+    let verification: DownloadItem.Verification
+
+    var body: some View {
+        switch verification {
+        case .running:
+            HStack(spacing: 4) {
+                ProgressView().controlSize(.mini)
+                Text(tr("Vérification SHA-256…", "Verifying SHA-256…"))
+            }
+            .font(.caption).foregroundStyle(.secondary)
+        case .ok:
+            Label(tr("SHA-256 vérifié", "SHA-256 verified"), systemImage: "checkmark.shield.fill")
+                .font(.caption).foregroundStyle(.green)
+        case .mismatch:
+            Label(tr("SHA-256 invalide — fichier corrompu, à retélécharger",
+                     "SHA-256 mismatch — corrupted file, download again"),
+                  systemImage: "xmark.shield.fill")
+                .font(.caption).foregroundStyle(.red)
+        case .error(let message):
+            Label(tr("Vérification impossible : ", "Verification failed: ") + message,
+                  systemImage: "exclamationmark.shield")
+                .font(.caption).foregroundStyle(.orange)
+        }
+    }
 }

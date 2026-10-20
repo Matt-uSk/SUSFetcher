@@ -1,0 +1,21 @@
+name: Build
+
+# Compile on every push / pull request (no release).
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build
+        run: |
+          set -o pipefail
+          if ! ./build-app.sh 0.0.0-ci 2>&1 | tee build.log; then
+            # Surface compiler errors as GitHub annotations
+            grep -E "error:" build.log | sed -E 's/^(.*)$/::error::\1/' | head -40
+            exit 1
+          fi
