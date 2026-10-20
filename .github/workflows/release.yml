@@ -1,10 +1,18 @@
 name: Release
 
-# Pousser un tag vX.Y.Z construit SUS Fetcher.app sur un Mac Apple Silicon
-# et l'attache à la Release GitHub correspondante.
+# Construit SUS Fetcher.app sur un Mac Apple Silicon et l'attache à une Release GitHub.
+# Deux déclencheurs :
+#  - pousser un tag vX.Y.Z
+#  - Actions > Release > « Run workflow » en saisissant la version (crée le tag et la Release)
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version à publier (ex. v1.0.0)"
+        required: true
+        default: "v1.0.0"
 
 permissions:
   contents: write
@@ -12,6 +20,8 @@ permissions:
 jobs:
   build:
     runs-on: macos-latest   # runner Apple Silicon
+    env:
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -23,19 +33,19 @@ jobs:
       - name: Build
         env:
           BUILD_NUMBER: ${{ github.run_number }}
-        run: ./build-app.sh "${GITHUB_REF_NAME}"
+        run: ./build-app.sh "${TAG}"
 
       - name: Package
         run: |
           cd build
-          ditto -c -k --sequesterRsrc --keepParent "SUS Fetcher.app" "SUS-Fetcher-${GITHUB_REF_NAME}.zip"
-          shasum -a 256 "SUS-Fetcher-${GITHUB_REF_NAME}.zip" | tee "SUS-Fetcher-${GITHUB_REF_NAME}.zip.sha256"
+          ditto -c -k --sequesterRsrc --keepParent "SUS Fetcher.app" "SUS-Fetcher-${TAG}.zip"
+          shasum -a 256 "SUS-Fetcher-${TAG}.zip" | tee "SUS-Fetcher-${TAG}.zip.sha256"
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ZIP="build/SUS-Fetcher-${GITHUB_REF_NAME}.zip"
+          ZIP="build/SUS-Fetcher-${TAG}.zip"
           NOTES=$(cat <<'MD'
           ## Installation
 
@@ -50,10 +60,11 @@ jobs:
           Apple Silicon, macOS 14 ou plus récent.
           MD
           )
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "$ZIP" "$ZIP.sha256" --clobber
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ZIP" "$ZIP.sha256" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" "$ZIP" "$ZIP.sha256" \
-              --title "SUS Fetcher ${GITHUB_REF_NAME}" \
+            gh release create "$TAG" "$ZIP" "$ZIP.sha256" \
+              --target "$GITHUB_SHA" \
+              --title "SUS Fetcher ${TAG}" \
               --notes "$NOTES"
           fi
