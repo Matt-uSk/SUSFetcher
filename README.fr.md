@@ -27,6 +27,7 @@ App macOS native (Swift/SwiftUI, Apple Silicon, macOS 14+, sans aucune dépendan
 - **Langue** : système / français / English (changement immédiat)
 - **Apparence** : système / clair / sombre
 - **Dossier de téléchargement** par défaut
+- **Catalogue Apple** : version de macOS détectée, URL de catalogue personnalisée (optionnelle)
 - **Nommage des installers** : préréglages ou modèle personnalisé, avec aperçu
 
 | Préréglage | Exemple |

@@ -27,8 +27,8 @@ Native macOS app (Swift/SwiftUI, Apple Silicon, macOS 14+, zero dependencies) th
 - **Language**: system / Français / English (applied instantly)
 - **Appearance**: system / light / dark
 - Default **download folder**
-- **Installer naming**: presets or custom template, with live preview
 - **Apple catalog**: detected macOS version, optional custom catalog URL
+- **Installer naming**: presets or custom template, with live preview
 
 | Preset | Example |
 |---|---|
