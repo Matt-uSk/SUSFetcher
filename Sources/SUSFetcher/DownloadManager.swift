@@ -53,9 +53,15 @@ struct DownloadItem: Identifiable, Equatable {
     let expectedSize: Int64
     let createdAt: Date
     var state: State
-    /// SHA-256 attendu (IPSW) : vérifié automatiquement à la fin du téléchargement.
-    var sha256: String? = nil
+    /// Empreinte attendue (IPSW) : vérifiée automatiquement à la fin du téléchargement.
+    var checksum: Checksum? = nil
     var verification: Verification? = nil
+
+    struct Checksum: Equatable, Sendable {
+        enum Algorithm: String, Sendable { case sha256 = "SHA-256", sha1 = "SHA-1" }
+        let algorithm: Algorithm
+        let value: String
+    }
 
     enum Verification: Equatable {
         case running
@@ -189,12 +195,12 @@ final class DownloadManager {
         guard let item = item(url), case .failed = item.state else { return }
         items.removeAll { $0.source == url }
         start(SUPackage(url: url, size: item.expectedSize), to: item.destination,
-              title: item.title, sha256: item.sha256)
+              title: item.title, checksum: item.checksum)
     }
 
-    /// Téléchargement générique (IPSW…) avec vérification SHA-256 optionnelle.
-    func download(url: URL, size: Int64, to destination: URL, title: String, sha256: String?) {
-        start(SUPackage(url: url, size: size), to: destination, title: title, sha256: sha256)
+    /// Téléchargement générique (IPSW…) avec vérification d'empreinte optionnelle.
+    func download(url: URL, size: Int64, to destination: URL, title: String, checksum: DownloadItem.Checksum?) {
+        start(SUPackage(url: url, size: size), to: destination, title: title, checksum: checksum)
     }
 
     func remove(_ url: URL) {
@@ -216,7 +222,8 @@ final class DownloadManager {
         items[i].state = state
     }
 
-    private func start(_ pkg: SUPackage, to destination: URL, title: String, sha256: String? = nil) {
+    private func start(_ pkg: SUPackage, to destination: URL, title: String,
+                       checksum: DownloadItem.Checksum? = nil) {
         if let existing = state(of: pkg.url), !existing.isDone { return }
         items.removeAll { $0.source == pkg.url }
 
@@ -227,7 +234,7 @@ final class DownloadManager {
             source: pkg.url, destination: destination, title: title,
             expectedSize: pkg.size, createdAt: .now,
             state: .downloading(TransferProgress(received: 0, total: pkg.size, startedAt: .now)),
-            sha256: sha256?.lowercased()
+            checksum: checksum.map { .init(algorithm: $0.algorithm, value: $0.value.lowercased()) }
         ))
         task.resume()
     }
@@ -238,19 +245,29 @@ final class DownloadManager {
     }
 
     /// Calcule le SHA-256 en flux (fichiers de 10 Go+) hors du thread principal.
-    private func verify(_ source: URL, file: URL, expected: String) {
+    private func verify(_ source: URL, file: URL, expected: DownloadItem.Checksum) {
         setVerification(source, .running)
         Task.detached(priority: .utility) {
             let result: DownloadItem.Verification
             do {
                 let handle = try FileHandle(forReadingFrom: file)
                 defer { try? handle.close() }
-                var hasher = SHA256()
-                while let chunk = try handle.read(upToCount: 8 * 1024 * 1024), !chunk.isEmpty {
-                    hasher.update(data: chunk)
+                let digest: String
+                switch expected.algorithm {
+                case .sha256:
+                    var hasher = SHA256()
+                    while let chunk = try handle.read(upToCount: 8 * 1024 * 1024), !chunk.isEmpty {
+                        hasher.update(data: chunk)
+                    }
+                    digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+                case .sha1:
+                    var hasher = Insecure.SHA1()
+                    while let chunk = try handle.read(upToCount: 8 * 1024 * 1024), !chunk.isEmpty {
+                        hasher.update(data: chunk)
+                    }
+                    digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
                 }
-                let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
-                result = digest == expected ? .ok : .mismatch
+                result = digest == expected.value ? .ok : .mismatch
             } catch {
                 result = .error(error.localizedDescription)
             }
@@ -273,7 +290,7 @@ final class DownloadManager {
         case .success(let file):
             set(source, .finished(file))
             _ = NSApp.requestUserAttention(.informationalRequest)
-            if let expected = item(source)?.sha256, !expected.isEmpty {
+            if let expected = item(source)?.checksum, !expected.value.isEmpty {
                 verify(source, file: file, expected: expected)
             }
         case .failure(let error):

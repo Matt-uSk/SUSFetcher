@@ -2,6 +2,18 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.0] - 2026-10-20
+
+### Added
+- IPSW fallback chain when ipsw.me is unreachable: last saved copy on disk (with its date), then Apple's official restore lists (latest signed version per model).
+- SHA-1 verification for firmwares coming from Apple's lists (SHA-256 is still used for ipsw.me data).
+- Source indicator in the IPSW pages (ipsw.me / offline cache / Apple fallback) and a warning banner when not using ipsw.me.
+
+### Fixed
+- IPSW pages now use the full window height (the device list was squeezed in the middle).
+- Models are sorted newest first (by identifier) instead of reverse alphabetical order.
+- iMac models were missing from the Mac section.
+
 ## [1.2.0] - 2026-10-20
 
 ### Added

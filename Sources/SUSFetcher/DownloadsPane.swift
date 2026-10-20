@@ -188,7 +188,9 @@ struct DownloadRow: View {
                         .tint(item.state.isPaused ? .secondary : .accentColor)
                 }
                 Text(detail).font(.caption).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
-                if let v = item.verification { VerificationBadge(verification: v) }
+                if let v = item.verification {
+                    VerificationBadge(verification: v, algorithm: item.checksum?.algorithm.rawValue ?? "SHA-256")
+                }
             }
 
             Spacer(minLength: 8)
@@ -277,21 +279,22 @@ struct DownloadRow: View {
 /// Résultat du contrôle SHA-256 (IPSW).
 struct VerificationBadge: View {
     let verification: DownloadItem.Verification
+    let algorithm: String
 
     var body: some View {
         switch verification {
         case .running:
             HStack(spacing: 4) {
                 ProgressView().controlSize(.mini)
-                Text(tr("Vérification SHA-256…", "Verifying SHA-256…"))
+                Text(tr("Vérification \(algorithm)…", "Verifying \(algorithm)…"))
             }
             .font(.caption).foregroundStyle(.secondary)
         case .ok:
-            Label(tr("SHA-256 vérifié", "SHA-256 verified"), systemImage: "checkmark.shield.fill")
+            Label(tr("\(algorithm) vérifié", "\(algorithm) verified"), systemImage: "checkmark.shield.fill")
                 .font(.caption).foregroundStyle(.green)
         case .mismatch:
-            Label(tr("SHA-256 invalide — fichier corrompu, à retélécharger",
-                     "SHA-256 mismatch — corrupted file, download again"),
+            Label(tr("\(algorithm) invalide — fichier corrompu, à retélécharger",
+                     "\(algorithm) mismatch — corrupted file, download again"),
                   systemImage: "xmark.shield.fill")
                 .font(.caption).foregroundStyle(.red)
         case .error(let message):
