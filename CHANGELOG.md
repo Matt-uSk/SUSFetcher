@@ -2,6 +2,16 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.5.0] - 2026-10-20
+
+### Added
+- **Built-in updater**: checks GitHub Releases at launch (at most once a day) or via *SUS Fetcher → Check for Updates…*. When a new version is out, shows what's new with **Install and Relaunch**, View on GitHub, Later or Skip This Version.
+- The update is downloaded, its SHA-256 checked against the release, its bundle identifier verified, then the app is replaced and relaunched — no quarantine prompt for updated versions.
+- Settings → Updates: installed version, automatic checks on/off, “Check Now”.
+
+### Notes
+- Versions up to 1.4.1 don't include the updater: install 1.5.0 manually once, later versions will update themselves.
+
 ## [1.4.1] - 2026-10-20
 
 ### Added

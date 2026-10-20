@@ -197,6 +197,8 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
             }
 
+            UpdatesSettingsSection(updater: Updater.shared)
+
             Section(tr("Téléchargements", "Downloads")) {
                 LabeledContent(tr("Dossier par défaut", "Default folder")) {
                     HStack(spacing: 8) {

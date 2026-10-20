@@ -18,6 +18,11 @@ struct SUSFetcherApp: App {
                 .frame(minWidth: 960, minHeight: 520)
         }
         .commands {
+            CommandGroup(after: .appInfo) {
+                Button(tr("Rechercher les mises à jour…", "Check for Updates…")) {
+                    Task { await Updater.shared.check(userInitiated: true) }
+                }
+            }
             CommandGroup(after: .sidebar) {
                 Button(tr("Installers macOS", "macOS Installers")) { viewState.sidebar = .installers }
                     .keyboardShortcut("1")
@@ -59,6 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         MainActor.assumeIsolated {
             AppSettings.shared.applyAppearance()
+            Updater.shared.checkAutomaticallyIfNeeded()
         }
         NSApp.activate(ignoringOtherApps: true)
     }

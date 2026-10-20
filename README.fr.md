@@ -54,6 +54,8 @@ xattr -dr com.apple.quarantine "/Applications/SUS Fetcher.app"
 
 Apple Silicon, macOS 14 ou plus récent.
 
+Ensuite, SUS Fetcher **se met à jour tout seul** : il consulte les Releases GitHub une fois par jour (ou *SUS Fetcher → Rechercher les mises à jour…*) et peut installer la nouvelle version et se relancer en un clic.
+
 ## Build depuis les sources
 
 ```bash
