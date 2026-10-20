@@ -1,16 +1,16 @@
 name: Release
 
-# Construit SUS Fetcher.app sur un Mac Apple Silicon et l'attache à une Release GitHub.
-# Deux déclencheurs :
-#  - pousser un tag vX.Y.Z
-#  - Actions > Release > « Run workflow » en saisissant la version (crée le tag et la Release)
+# Builds SUS Fetcher.app on an Apple Silicon Mac and attaches it to a GitHub Release.
+# Two triggers:
+#  - push a vX.Y.Z tag
+#  - Actions > Release > "Run workflow", entering the version (creates the tag and the Release)
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
       version:
-        description: "Version à publier (ex. v1.0.0)"
+        description: "Version to publish (e.g. v1.1.0)"
         required: true
         default: "v1.0.0"
 
@@ -36,7 +36,7 @@ jobs:
         run: |
           set -o pipefail
           if ! ./build-app.sh "${TAG}" 2>&1 | tee build.log; then
-            # Remonte les erreurs du compilateur en annotations GitHub
+            # Surface compiler errors as GitHub annotations
             grep -E "error:" build.log | sed -E 's/^(.*)$/::error::\1/' | head -40
             exit 1
           fi
@@ -55,15 +55,15 @@ jobs:
           cat > notes.md <<'MD'
           ## Installation
 
-          1. Télécharger `SUS-Fetcher-*.zip`, le décompresser et glisser **SUS Fetcher.app** dans `/Applications`.
-          2. L'app est signée ad-hoc (pas de Developer ID) : au premier lancement, macOS la bloque.
-             Retirer la quarantaine une fois :
+          1. Download `SUS-Fetcher-*.zip`, unzip it and drag **SUS Fetcher.app** into `/Applications`.
+          2. The app is ad-hoc signed (no Developer ID), so macOS blocks it on first launch.
+             Remove the quarantine flag once:
 
              ```bash
              xattr -dr com.apple.quarantine "/Applications/SUS Fetcher.app"
              ```
 
-          Apple Silicon, macOS 14 ou plus récent.
+          Apple Silicon, macOS 14 or later. — 🇫🇷 [Instructions en français](https://github.com/Matt-uSk/SUSFetcher/blob/main/README.fr.md#installation)
           MD
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$ZIP" "$ZIP.sha256" --clobber

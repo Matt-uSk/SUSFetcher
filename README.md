@@ -2,77 +2,82 @@
 
 # SUS Fetcher
 
-App macOS native (Swift/SwiftUI, Apple Silicon, macOS 14+, sans aucune dépendance) qui lit le catalogue Apple Software Update et télécharge `InstallAssistant.pkg` **en un clic**, sans passer par clic droit → Packages → InstallAssistant.pkg.
+🇫🇷 [Version française](README.fr.md)
 
-## Origine et crédits
+Native macOS app (Swift/SwiftUI, Apple Silicon, macOS 14+, zero dependencies) that reads the Apple Software Update catalog and downloads `InstallAssistant.pkg` **in one click** — no more right-click → Packages → InstallAssistant.pkg.
 
-- **Inspiré de [SUS Inspector](https://github.com/hjuutilainen/sus-inspector)** de Hannes Juutilainen. Le concept (parcourir le catalogue Apple Software Update et en extraire les paquets) vient de là. SUS Inspector reposant sur Python 2 / PyObjC, SUS Fetcher en est une réécriture complète et moderne, centrée sur le téléchargement des installers macOS. Aucun code de SUS Inspector n'a été repris.
-- **La majorité du code a été écrite par [Claude](https://claude.ai) (Anthropic)**.
+## Origin and credits
 
-## Fonctions
+- **Inspired by [SUS Inspector](https://github.com/hjuutilainen/sus-inspector)** by Hannes Juutilainen. The concept (browsing the Apple Software Update catalog and extracting its packages) comes from there. Since SUS Inspector relies on Python 2 / PyObjC, SUS Fetcher is a complete, modern rewrite focused on downloading macOS installers. No code from SUS Inspector was reused.
+- **Most of the code was written by [Claude](https://claude.ai) (Anthropic)**.
 
-- Sidebar **Installers macOS** / **Autres** / **Téléchargements** (⌘1 / ⌘2 / ⌘3)
-- Bouton « InstallAssistant.pkg » par ligne, double-clic, multi-sélection (clic droit)
-- Page Téléchargements + mini-moniteur en bas de la sidebar : progression, vitesse, temps restant, **pause / reprise**, annulation, réessai
-- Confirmation avant de quitter si des téléchargements sont en cours
-- Produits « Autres » : menu des paquets, rangés dans `<Titre> <version> [<Product ID>]/`
-- Canaux : Public, Bêta publique, Bêta développeur, AppleSeed — produits bêta marqués BÊTA, filtre « Bêtas uniquement »
-- Recherche par titre / version / build / Product ID
-- Métadonnées (.dist) mises en cache dans `~/Library/Application Support/SUSFetcher/`
+## Features
 
-## Réglages (⌘,)
+- Sidebar: **macOS Installers** / **Other** / **Downloads** (⌘1 / ⌘2 / ⌘3)
+- “InstallAssistant.pkg” button on each row, double-click, multi-selection (right-click)
+- Downloads page + mini monitor at the bottom of the sidebar: progress, speed, time remaining, **pause / resume**, cancel, retry
+- Confirmation before quitting while downloads are in progress
+- “Other” products: package menu, saved into `<Title> <version> [<Product ID>]/`
+- Channels: Public, Public beta, Developer beta, AppleSeed — beta-only products get a BETA badge, “Betas only” filter
+- Search by title / version / build / Product ID
+- Metadata (.dist) cached in `~/Library/Application Support/SUSFetcher/`
 
-- **Langue** : système / français / English (changement immédiat)
-- **Apparence** : système / clair / sombre
-- **Dossier de téléchargement** par défaut
-- **Nommage des installers** : préréglages ou modèle personnalisé, avec aperçu
+## Settings (⌘,)
 
-| Préréglage | Exemple |
+- **Language**: system / Français / English (applied instantly)
+- **Appearance**: system / light / dark
+- Default **download folder**
+- **Installer naming**: presets or custom template, with live preview
+- **Apple catalog**: detected macOS version, optional custom catalog URL
+
+| Preset | Example |
 |---|---|
-| Nom Apple d'origine | `InstallAssistant.pkg` |
+| Original Apple name | `InstallAssistant.pkg` |
 | InstallAssistant + version + build | `InstallAssistant-26.7.1-25H123.pkg` |
-| Lisible (défaut) | `InstallermacOSTahoe-26.7.1.pkg` |
-| Lisible + build | `InstallermacOSTahoe-26.7.1-25H123.pkg` |
+| Readable (default) | `InstallermacOSTahoe-26.7.1.pkg` |
+| Readable + build | `InstallermacOSTahoe-26.7.1-25H123.pkg` |
 
-Jetons du modèle personnalisé : `{name}` (titre sans espaces), `{title}`, `{version}`, `{build}`, `{id}`.
-Un jeton vide est supprimé avec son séparateur.
+Custom template tokens: `{name}` (title without spaces), `{title}`, `{version}`, `{build}`, `{id}`.
+An empty token is removed together with its separator.
 
 ## Installation
 
-Télécharger la dernière version dans les [Releases](https://github.com/Matt-uSk/SUSFetcher/releases), décompresser et glisser **SUS Fetcher.app** dans `/Applications`.
+Download the latest version from [Releases](https://github.com/Matt-uSk/SUSFetcher/releases), unzip it and drag **SUS Fetcher.app** into `/Applications`.
 
-L'app est signée ad-hoc (pas de Developer ID Apple) : au premier lancement macOS la bloque. Retirer la quarantaine une fois :
+The app is ad-hoc signed (no Apple Developer ID), so macOS blocks it on first launch. Remove the quarantine flag once:
 
 ```bash
 xattr -dr com.apple.quarantine "/Applications/SUS Fetcher.app"
 ```
 
-Apple Silicon, macOS 14 ou plus récent.
+Apple Silicon, macOS 14 or later.
 
-## Build depuis les sources
+## Building from source
 
 ```bash
 chmod +x build-app.sh
 ./build-app.sh 1.0.0      # → build/SUS Fetcher.app
 ```
 
-Ou pour tester rapidement : `swift run`. Ou `open Package.swift` pour l'ouvrir dans Xcode.
+For a quick test: `swift run`. Or `open Package.swift` to work in Xcode.
 
-## Versions futures de macOS
+## Future macOS versions
 
-Rien à modifier ni à recompiler. Au lancement, SUS Fetcher détecte la dernière version majeure publiée par Apple : il part de la plus haute version connue (version du Mac, dernière détection, ou 27) et teste les catalogues suivants jusqu'au premier 404. Le résultat est mémorisé, et visible dans la barre de statut et les réglages.
+Nothing to edit or recompile. At launch, SUS Fetcher detects the latest major version published by Apple: it starts from the highest known version (the Mac's own version, the last detected one, or 27) and probes the next catalogs until the first 404. The result is remembered and shown in the status bar and in Settings.
 
-Le catalogue public contient de toute façon les nouveaux installers (Apple les ajoute aussi aux anciens catalogues) ; la détection sert surtout aux canaux bêta, dont l'URL inclut le numéro de version. En dépannage, une URL de catalogue personnalisée peut être saisie dans les réglages.
+The public catalog already includes new installers anyway (Apple also adds them to older catalogs); detection mostly matters for beta channels, whose URL contains the version number. For troubleshooting, a custom catalog URL can be entered in Settings.
 
-## Publier une version
+## Publishing a release
 
-Pousser un tag : la GitHub Action [`release.yml`](.github/workflows/release.yml) compile l'app sur un Mac Apple Silicon et l'attache à la Release.
+The [`release.yml`](.github/workflows/release.yml) GitHub Action builds the app on an Apple Silicon Mac and attaches it to a Release. Two ways to trigger it:
+
+- **Actions → Release → Run workflow**, entering the version (e.g. `v1.1.0`): the tag and the Release are created automatically.
+- Or push a tag:
 
 ```bash
 git tag v1.1.0 && git push origin v1.1.0
 ```
 
-## Licence
+## License
 
-[MIT](LICENSE) — fais-en ce que tu veux.
-
+[MIT](LICENSE) — do whatever you want with it.
