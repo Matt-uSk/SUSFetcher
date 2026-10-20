@@ -39,7 +39,7 @@ struct SUSFetcherApp: App {
 
         // Fenêtre Réglages standard (menu de l'app > Réglages…, ⌘,)
         Settings {
-            SettingsView(settings: settings, downloads: downloads)
+            SettingsView(settings: settings, downloads: downloads, catalog: catalog)
         }
     }
 }

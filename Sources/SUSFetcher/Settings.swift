@@ -86,6 +86,7 @@ final class AppSettings {
         static let appearance = "appearance"
         static let naming = "installerNaming"
         static let customTemplate = "installerCustomTemplate"
+        static let customCatalog = "customCatalogURL"
     }
 
     var language: AppLanguage {
@@ -107,12 +108,24 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(customTemplate, forKey: Key.customTemplate) }
     }
 
+    /// URL de catalogue saisie à la main (avancé). Vide = détection automatique.
+    var customCatalog: String {
+        didSet { UserDefaults.standard.set(customCatalog, forKey: Key.customCatalog) }
+    }
+
+    var customCatalogURL: URL? {
+        let s = customCatalog.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !s.isEmpty, let url = URL(string: s), url.scheme?.hasPrefix("http") == true else { return nil }
+        return url
+    }
+
     init() {
         let d = UserDefaults.standard
         language = d.string(forKey: Key.language).flatMap(AppLanguage.init(rawValue:)) ?? .system
         appearance = d.string(forKey: Key.appearance).flatMap(AppAppearance.init(rawValue:)) ?? .system
         naming = d.string(forKey: Key.naming).flatMap(InstallerNaming.init(rawValue:)) ?? .readable
         customTemplate = d.string(forKey: Key.customTemplate) ?? "Installer{name}-{version}-{build}"
+        customCatalog = d.string(forKey: Key.customCatalog) ?? ""
     }
 
     var isFrench: Bool {
@@ -170,6 +183,7 @@ enum InstallerFileName {
 struct SettingsView: View {
     let settings: AppSettings
     let downloads: DownloadManager
+    let catalog: CatalogModel
 
     var body: some View {
         Form {
@@ -201,6 +215,34 @@ struct SettingsView: View {
                         .help(tr("Ouvrir dans le Finder", "Open in Finder"))
                     }
                 }
+            }
+
+            Section {
+                LabeledContent(tr("Version détectée", "Detected version")) {
+                    if let major = catalog.catalogMajor {
+                        Text("macOS \(major)")
+                    } else if settings.customCatalogURL != nil {
+                        Text(tr("URL personnalisée", "Custom URL")).foregroundStyle(.secondary)
+                    } else {
+                        Text("—").foregroundStyle(.secondary)
+                    }
+                }
+                TextField(tr("URL personnalisée", "Custom URL"),
+                          text: Binding(settings, \.customCatalog),
+                          prompt: Text(tr("Automatique", "Automatic")))
+                    .font(.callout.monospaced())
+                    .onSubmit { catalog.reload() }
+                HStack {
+                    Spacer()
+                    Button(tr("Redétecter et recharger", "Re-detect and reload")) { catalog.clearCacheAndReload() }
+                }
+            } header: {
+                Text(tr("Catalogue Apple", "Apple catalog"))
+            } footer: {
+                Text(tr("La dernière version de macOS est détectée automatiquement : rien à modifier quand une nouvelle version majeure sort. L'URL personnalisée (canal Public) n'est utile qu'en dépannage.",
+                        "The latest macOS version is detected automatically: nothing to change when a new major version ships. The custom URL (Public channel) is only for troubleshooting."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section {

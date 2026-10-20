@@ -23,7 +23,7 @@ jobs:
     env:
       TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Toolchain
         run: |
@@ -33,7 +33,13 @@ jobs:
       - name: Build
         env:
           BUILD_NUMBER: ${{ github.run_number }}
-        run: ./build-app.sh "${TAG}"
+        run: |
+          set -o pipefail
+          if ! ./build-app.sh "${TAG}" 2>&1 | tee build.log; then
+            # Remonte les erreurs du compilateur en annotations GitHub
+            grep -E "error:" build.log | sed -E 's/^(.*)$/::error::\1/' | head -40
+            exit 1
+          fi
 
       - name: Package
         run: |
@@ -46,7 +52,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ZIP="build/SUS-Fetcher-${TAG}.zip"
-          NOTES=$(cat <<'MD'
+          cat > notes.md <<'MD'
           ## Installation
 
           1. Télécharger `SUS-Fetcher-*.zip`, le décompresser et glisser **SUS Fetcher.app** dans `/Applications`.
@@ -59,12 +65,11 @@ jobs:
 
           Apple Silicon, macOS 14 ou plus récent.
           MD
-          )
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$ZIP" "$ZIP.sha256" --clobber
           else
             gh release create "$TAG" "$ZIP" "$ZIP.sha256" \
               --target "$GITHUB_SHA" \
               --title "SUS Fetcher ${TAG}" \
-              --notes "$NOTES"
+              --notes-file notes.md
           fi

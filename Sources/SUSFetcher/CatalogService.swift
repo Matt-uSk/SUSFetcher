@@ -15,9 +15,34 @@ enum CatalogError: Error {
     }
 }
 
+/// Construit les URLs du catalogue Apple. Aucune version n'est figée :
+/// la dernière version majeure est détectée au lancement (cf. `CatalogService.resolve`).
+enum CatalogLocator {
+    /// Plus haute version connue à la compilation : simple point de départ de la détection.
+    static let baselineMajor = 27
+    /// Première version de la numérotation « année » (après macOS 15 vient macOS 26).
+    static let firstYearMajor = 26
+    /// Partie fixe de l'URL (versions historiques), identique depuis macOS 26.
+    static let legacyTail =
+        "15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard"
+
+    static func url(_ channel: CatalogChannel, major: Int) -> URL {
+        let majors = stride(from: major, through: firstYearMajor, by: -1).map(String.init).joined(separator: "-")
+        let name = "index-\(channel.prefix(major: major))\(majors)-\(legacyTail).merged-1.sucatalog"
+        return URL(string: "https://swscan.apple.com/content/catalogs/others/\(name)")!
+    }
+}
+
+struct CatalogResult: Sendable {
+    let products: [SUProduct]
+    let major: Int?        // version majeure détectée (nil si URL personnalisée)
+    let url: URL
+}
+
 /// Télécharge et parse le catalogue SUS, résout les métadonnées (.dist) avec un cache disque.
 actor CatalogService {
     private let session: URLSession
+    private var resolvedMajor: [CatalogChannel: Int] = [:]
     private let cacheURL: URL
     private var cache: [String: DistInfo] = [:]
     private var cacheLoaded = false
@@ -39,16 +64,67 @@ actor CatalogService {
 
     /// Les catalogues bêta sont des sur-ensembles du catalogue public : on charge aussi le public
     /// pour marquer `isBeta` les produits qui n'existent que dans le canal bêta.
-    func fetchCatalog(_ channel: CatalogChannel) async throws -> [SUProduct] {
+    /// `customReleaseURL` (réglages) remplace l'URL détectée du catalogue public.
+    func fetchCatalog(_ channel: CatalogChannel, customReleaseURL: URL?) async throws -> CatalogResult {
         loadCacheIfNeeded()
 
-        if channel == .release {
-            return parse(try await fetchProducts(channel.url), releaseIDs: nil)
+        let release: (url: URL, major: Int?)
+        if let customReleaseURL {
+            release = (customReleaseURL, nil)
+        } else {
+            let r = await resolve(.release)
+            release = (r.url, r.major)
         }
-        async let beta = fetchProducts(channel.url)
-        async let release = fetchProducts(CatalogChannel.release.url)
-        let (betaProducts, releaseProducts) = try await (beta, release)
-        return parse(betaProducts, releaseIDs: Set(releaseProducts.keys))
+
+        if channel == .release {
+            let products = parse(try await fetchProducts(release.url), releaseIDs: nil)
+            return CatalogResult(products: products, major: release.major, url: release.url)
+        }
+
+        let beta = await resolve(channel)
+        async let betaProducts = fetchProducts(beta.url)
+        async let releaseProducts = fetchProducts(release.url)
+        let (b, r) = try await (betaProducts, releaseProducts)
+        return CatalogResult(products: parse(b, releaseIDs: Set(r.keys)), major: beta.major, url: beta.url)
+    }
+
+    // MARK: Détection de la dernière version majeure
+
+    /// Trouve la plus haute version majeure dont le catalogue existe pour ce canal.
+    /// Point de départ : max(version connue, version du Mac, dernière détection), puis on teste
+    /// N+1, N+2… jusqu'au premier 404. Résultat mémorisé (UserDefaults) pour les lancements suivants.
+    func resolve(_ channel: CatalogChannel) async -> (url: URL, major: Int) {
+        if let major = resolvedMajor[channel] {
+            return (CatalogLocator.url(channel, major: major), major)
+        }
+
+        let key = "catalogMajor.\(channel.rawValue)"
+        let osMajor = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+        let remembered = UserDefaults.standard.integer(forKey: key)
+        var major = max(CatalogLocator.baselineMajor, osMajor, remembered)
+
+        // Point de départ inexistant (ex. Mac sur une bêta dont le catalogue n'est pas public) : on redescend.
+        while major > CatalogLocator.baselineMajor, !(await exists(CatalogLocator.url(channel, major: major))) {
+            major -= 1
+        }
+        // On monte tant qu'Apple publie un catalogue plus récent.
+        while await exists(CatalogLocator.url(channel, major: major + 1)) {
+            major += 1
+        }
+
+        resolvedMajor[channel] = major
+        UserDefaults.standard.set(major, forKey: key)
+        return (CatalogLocator.url(channel, major: major), major)
+    }
+
+    /// Teste l'existence d'un catalogue en ne demandant qu'un octet.
+    private func exists(_ url: URL) async -> Bool {
+        var request = URLRequest(url: url)
+        request.setValue("bytes=0-0", forHTTPHeaderField: "Range")
+        request.timeoutInterval = 15
+        guard let (_, response) = try? await session.data(for: request),
+              let http = response as? HTTPURLResponse else { return false }
+        return http.statusCode == 200 || http.statusCode == 206
     }
 
     private func fetchProducts(_ url: URL) async throws -> [String: Any] {
@@ -129,6 +205,7 @@ actor CatalogService {
     }
 
     func clearCache() {
+        resolvedMajor = [:]
         cache = [:]
         dirty = false
         try? FileManager.default.removeItem(at: cacheURL)

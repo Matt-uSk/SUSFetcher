@@ -12,6 +12,8 @@ final class CatalogModel {
     private(set) var status: String?
     private(set) var errorMessage: String?
     private(set) var lastRefresh: Date?
+    private(set) var catalogMajor: Int?
+    private(set) var catalogURL: URL?
 
     @ObservationIgnored private let service = CatalogService()
     @ObservationIgnored private var loadTask: Task<Void, Never>?
@@ -45,8 +47,12 @@ final class CatalogModel {
         status = tr("Téléchargement du catalogue \(channel.label)…", "Downloading \(channel.label) catalog…")
 
         do {
-            let list = try await service.fetchCatalog(channel)
+            let custom = AppSettings.shared.customCatalogURL
+            let result = try await service.fetchCatalog(channel, customReleaseURL: custom)
             guard !Task.isCancelled else { return }
+            let list = result.products
+            catalogMajor = result.major
+            catalogURL = result.url
             products = list
             indexByID = Dictionary(uniqueKeysWithValues: list.enumerated().map { ($1.id, $0) })
             lastRefresh = .now

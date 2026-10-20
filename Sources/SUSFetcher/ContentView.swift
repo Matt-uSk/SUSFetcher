@@ -499,7 +499,8 @@ struct StatusBar: View {
         if let status = catalog.status { return status }
         guard let date = catalog.lastRefresh else { return "" }
         let time = date.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(AppSettings.shared.locale))
-        return tr("\(catalog.channel.label) — \(catalog.products.count) produits — mis à jour à \(time)",
-                  "\(catalog.channel.label) — \(catalog.products.count) products — updated at \(time)")
+        let source = catalog.catalogMajor.map { " (macOS \($0))" } ?? ""
+        return tr("\(catalog.channel.label)\(source) — \(catalog.products.count) produits — mis à jour à \(time)",
+                  "\(catalog.channel.label)\(source) — \(catalog.products.count) products — updated at \(time)")
     }
 }

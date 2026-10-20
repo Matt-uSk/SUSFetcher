@@ -7,7 +7,7 @@ App macOS native (Swift/SwiftUI, Apple Silicon, macOS 14+, sans aucune dépendan
 ## Origine et crédits
 
 - **Inspiré de [SUS Inspector](https://github.com/hjuutilainen/sus-inspector)** de Hannes Juutilainen. Le concept (parcourir le catalogue Apple Software Update et en extraire les paquets) vient de là. SUS Inspector reposant sur Python 2 / PyObjC, SUS Fetcher en est une réécriture complète et moderne, centrée sur le téléchargement des installers macOS. Aucun code de SUS Inspector n'a été repris.
-- **La majorité du code a été écrite par [Claude](https://claude.ai) (Anthropic)**, à partir des besoins, des tests et des retours de [Matt-uSk](https://github.com/Matt-uSk) sur une flotte de Mac gérée avec Jamf Pro.
+- **La majorité du code a été écrite par [Claude](https://claude.ai) (Anthropic)**.
 
 ## Fonctions
 
@@ -58,9 +58,11 @@ chmod +x build-app.sh
 
 Ou pour tester rapidement : `swift run`. Ou `open Package.swift` pour l'ouvrir dans Xcode.
 
-## Nouvelle version majeure de macOS
+## Versions futures de macOS
 
-Dans `Sources/SUSFetcher/Models.swift`, ajouter le numéro en tête de `CatalogChannel.versions` (ex. `28-27-26-…`) et mettre à jour `latestMajor`.
+Rien à modifier ni à recompiler. Au lancement, SUS Fetcher détecte la dernière version majeure publiée par Apple : il part de la plus haute version connue (version du Mac, dernière détection, ou 27) et teste les catalogues suivants jusqu'au premier 404. Le résultat est mémorisé, et visible dans la barre de statut et les réglages.
+
+Le catalogue public contient de toute façon les nouveaux installers (Apple les ajoute aussi aux anciens catalogues) ; la détection sert surtout aux canaux bêta, dont l'URL inclut le numéro de version. En dépannage, une URL de catalogue personnalisée peut être saisie dans les réglages.
 
 ## Publier une version
 

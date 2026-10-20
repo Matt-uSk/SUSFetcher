@@ -1,16 +1,12 @@
 import Foundation
 
 /// Canal du catalogue Apple Software Update.
-/// Pour une future version majeure (macOS 28…), il suffit d'ajouter "28-" en tête de `CatalogChannel.versions`
-/// et de changer `CatalogChannel.latestMajor`.
+/// L'URL n'est pas codée en dur : voir `CatalogLocator`, qui détecte la dernière version majeure.
 enum CatalogChannel: String, CaseIterable, Identifiable, Sendable {
     case release
     case publicBeta
     case developerSeed
     case customerSeed
-
-    static let latestMajor = "27"
-    static let versions = "27-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard"
 
     var id: String { rawValue }
 
@@ -23,15 +19,14 @@ enum CatalogChannel: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var url: URL {
-        let prefix: String
+    /// Préfixe de l'URL du canal pour une version majeure donnée (ex. "27seed-").
+    func prefix(major: Int) -> String {
         switch self {
-        case .release: prefix = ""
-        case .publicBeta: prefix = "\(Self.latestMajor)beta-"
-        case .developerSeed: prefix = "\(Self.latestMajor)seed-"
-        case .customerSeed: prefix = "\(Self.latestMajor)customerseed-"
+        case .release: ""
+        case .publicBeta: "\(major)beta-"
+        case .developerSeed: "\(major)seed-"
+        case .customerSeed: "\(major)customerseed-"
         }
-        return URL(string: "https://swscan.apple.com/content/catalogs/others/index-\(prefix)\(Self.versions).merged-1.sucatalog")!
     }
 }
 
