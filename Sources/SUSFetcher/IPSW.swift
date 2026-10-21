@@ -787,7 +787,7 @@ struct IPSWActionCell: View {
         DownloadControl(
             state: downloads.state(of: firmware.url),
             idleTitle: "IPSW",
-            existing: downloads.existingIPSW(firmware),
+            existing: downloads.existingIPSW(firmware, device: device),
             redownload: { Self.start(firmware, device: device, downloads: downloads) },
             start: {
                 switch downloads.state(of: firmware.url) {

@@ -23,9 +23,10 @@ struct TransferProgress: Equatable {
     }
 }
 
-/// Un téléchargement (en cours, en pause, terminé ou échoué).
+/// Un téléchargement (en attente, en cours, en pause, terminé ou échoué).
 struct DownloadItem: Identifiable, Equatable {
     enum State: Equatable {
+        case queued(TransferProgress?)      // en file d'attente (progression conservée si repris)
         case downloading(TransferProgress)
         case paused(TransferProgress)
         case finished(URL)
@@ -33,6 +34,9 @@ struct DownloadItem: Identifiable, Equatable {
 
         var isActive: Bool { if case .downloading = self { true } else { false } }
         var isPaused: Bool { if case .paused = self { true } else { false } }
+        var isQueued: Bool { if case .queued = self { true } else { false } }
+        /// Pas encore terminé (en attente, en cours ou en pause).
+        var isPending: Bool { isActive || isPaused || isQueued }
         var isDone: Bool {
             switch self {
             case .finished, .failed: true
@@ -42,6 +46,7 @@ struct DownloadItem: Identifiable, Equatable {
         var progress: TransferProgress? {
             switch self {
             case .downloading(let p), .paused(let p): p
+            case .queued(let p): p
             default: nil
             }
         }
@@ -122,7 +127,22 @@ final class DownloadManager {
 
     var activeCount: Int { items.filter(\.state.isActive).count }
     var pausedCount: Int { items.filter(\.state.isPaused).count }
-    var pendingCount: Int { activeCount + pausedCount }
+    var queuedCount: Int { items.filter(\.state.isQueued).count }
+    var pendingCount: Int { activeCount + pausedCount + queuedCount }
+
+    /// Nombre maximum de téléchargements simultanés ; les suivants attendent leur tour.
+    var maxConcurrent: Int = max(1, UserDefaults.standard.object(forKey: "maxConcurrentDownloads") as? Int ?? 3) {
+        didSet {
+            UserDefaults.standard.set(maxConcurrent, forKey: "maxConcurrentDownloads")
+            pump()
+        }
+    }
+
+    /// Position (1, 2…) d'un téléchargement dans la file d'attente.
+    func queuePosition(of url: URL) -> Int? {
+        let queue = items.filter(\.state.isQueued).sorted { $0.createdAt < $1.createdAt }
+        return queue.firstIndex { $0.source == url }.map { $0 + 1 }
+    }
 
     var totalSpeed: Double {
         items.reduce(0) { sum, item in
@@ -149,7 +169,7 @@ final class DownloadManager {
 
     /// IPSW, enregistré dans <dossier>/IPSW/<nom d'origine Apple>, avec vérification d'empreinte.
     func downloadIPSW(_ firmware: IPSWFirmware, device: IPSWDevice) {
-        start(SUPackage(url: firmware.url, size: firmware.size), to: ipswDestination(firmware),
+        start(SUPackage(url: firmware.url, size: firmware.size), to: ipswDestination(firmware, device: device),
               title: "\(device.name) — \(firmware.version) (\(firmware.build))",
               checksum: firmware.checksum)
     }
@@ -169,8 +189,11 @@ final class DownloadManager {
             .appending(path: pkg.fileName)
     }
 
-    func ipswDestination(_ firmware: IPSWFirmware) -> URL {
-        destinationFolder.appending(path: "IPSW", directoryHint: .isDirectory).appending(path: firmware.fileName)
+    func ipswDestination(_ firmware: IPSWFirmware, device: IPSWDevice) -> URL {
+        let name = IPSWFileName.make(template: AppSettings.shared.ipswTemplate, originalName: firmware.fileName,
+                                     deviceName: device.name, identifier: device.identifier,
+                                     version: firmware.version, build: firmware.build)
+        return destinationFolder.appending(path: "IPSW", directoryHint: .isDirectory).appending(path: name)
     }
 
     /// Fichier déjà présent et complet : même nom, même taille (si la taille attendue est connue).
@@ -194,8 +217,8 @@ final class DownloadManager {
             ?? LocalFiles.shared.match(size: pkg.size, sha1: pkg.sha1, sha256: nil)
     }
 
-    func existingIPSW(_ firmware: IPSWFirmware) -> URL? {
-        Self.existingFile(at: ipswDestination(firmware), expectedSize: firmware.size)
+    func existingIPSW(_ firmware: IPSWFirmware, device: IPSWDevice) -> URL? {
+        Self.existingFile(at: ipswDestination(firmware, device: device), expectedSize: firmware.size)
             ?? LocalFiles.shared.match(size: firmware.size, sha1: firmware.sha1, sha256: firmware.sha256)
     }
 
@@ -206,9 +229,15 @@ final class DownloadManager {
     // MARK: Contrôle
 
     func pause(_ url: URL) {
+        // En attente → en pause : il ne démarrera pas tant qu'il n'est pas repris.
+        if case .queued(let p)? = state(of: url) {
+            set(url, .paused(p ?? TransferProgress(received: 0, total: item(url)?.expectedSize ?? 0, startedAt: .now)))
+            return
+        }
         guard let task = tasks[url], case .downloading(let p)? = state(of: url) else { return }
         tasks[url] = nil
         set(url, .paused(p))
+        defer { pump() }
         task.cancel { [weak self] data in
             Task { @MainActor in
                 guard let self, case .paused = self.state(of: url) else { return }
@@ -218,21 +247,11 @@ final class DownloadManager {
         }
     }
 
+    /// Reprise : repasse par la file d'attente (respecte le nombre max de téléchargements).
     func resume(_ url: URL) {
-        guard let item = item(url), case .paused(var p) = item.state else { return }
-        let task: URLSessionDownloadTask
-        if let data = resumeData.removeValue(forKey: url) {
-            task = session.downloadTask(withResumeData: data)
-        } else {
-            task = session.downloadTask(with: url)
-            p.received = 0
-        }
-        p.startedAt = .now
-        p.startedReceived = p.received
-        bridge.register(task, source: url, destination: item.destination)
-        tasks[url] = task
-        set(url, .downloading(p))
-        task.resume()
+        guard let item = item(url), case .paused(let p) = item.state else { return }
+        set(url, .queued(p))
+        pump()
     }
 
     func cancel(_ url: URL) {
@@ -240,6 +259,7 @@ final class DownloadManager {
         tasks[url] = nil
         resumeData[url] = nil
         items.removeAll { $0.source == url }
+        pump()
     }
 
     func retry(_ url: URL) {
@@ -259,7 +279,10 @@ final class DownloadManager {
         items.removeAll { $0.source == url }
     }
 
-    func pauseAll() { for u in Array(tasks.keys) { pause(u) } }
+    func pauseAll() {
+        for i in items where i.state.isQueued { pause(i.source) }
+        for u in Array(tasks.keys) { pause(u) }
+    }
     func resumeAll() { for i in items where i.state.isPaused { resume(i.source) } }
     func cancelAll() { for i in items where !i.state.isDone { cancel(i.source) } }
     func clearFinished() { items.removeAll { $0.state.isDone } }
@@ -277,16 +300,38 @@ final class DownloadManager {
                        checksum: DownloadItem.Checksum? = nil) {
         if let existing = state(of: pkg.url), !existing.isDone { return }
         items.removeAll { $0.source == pkg.url }
-
-        let task = session.downloadTask(with: pkg.url)
-        bridge.register(task, source: pkg.url, destination: destination)
-        tasks[pkg.url] = task
         items.append(DownloadItem(
             source: pkg.url, destination: destination, title: title,
             expectedSize: pkg.size, createdAt: .now,
-            state: .downloading(TransferProgress(received: 0, total: pkg.size, startedAt: .now)),
+            state: .queued(nil),
             checksum: checksum.map { .init(algorithm: $0.algorithm, value: $0.value.lowercased()) }
         ))
+        pump()
+    }
+
+    /// Démarre les téléchargements en attente (ordre d'ajout) tant qu'il reste de la place.
+    private func pump() {
+        while activeCount < maxConcurrent,
+              let next = items.filter(\.state.isQueued).min(by: { $0.createdAt < $1.createdAt }) {
+            launch(next)
+        }
+    }
+
+    private func launch(_ item: DownloadItem) {
+        guard case .queued(let previous) = item.state else { return }
+        var p = previous ?? TransferProgress(received: 0, total: item.expectedSize, startedAt: .now)
+        let task: URLSessionDownloadTask
+        if let data = resumeData.removeValue(forKey: item.source) {
+            task = session.downloadTask(withResumeData: data)
+        } else {
+            task = session.downloadTask(with: item.source)
+            p.received = 0
+        }
+        p.startedAt = .now
+        p.startedReceived = p.received
+        bridge.register(task, source: item.source, destination: item.destination)
+        tasks[item.source] = task
+        set(item.source, .downloading(p))
         task.resume()
     }
 
@@ -337,6 +382,7 @@ final class DownloadManager {
     private func finish(_ source: URL, _ taskID: Int, _ result: Result<URL, Error>) {
         guard tasks[source]?.taskIdentifier == taskID else { return }   // annulé / mis en pause : ignoré
         tasks[source] = nil
+        defer { pump() }   // une place se libère
         switch result {
         case .success(let file):
             set(source, .finished(file))

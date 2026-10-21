@@ -17,6 +17,7 @@ App macOS native (Swift/SwiftUI, Apple Silicon, macOS 14+, sans aucune dépendan
 - Bouton « InstallAssistant.pkg » par ligne, double-clic, multi-sélection (clic droit)
 - Page Téléchargements + mini-moniteur en bas de la sidebar : progression, vitesse, temps restant, **pause / reprise**, annulation, réessai
 - Confirmation avant de quitter si des téléchargements sont en cours
+- File d'attente avec un nombre de téléchargements simultanés configurable
 - Détection des fichiers déjà présents dans le dossier de destination (**✓ Présent**), même renommés (taille + empreinte), pour éviter de les retélécharger
 - Produits « Autres » : menu des paquets, rangés dans `<Titre> <version> [<Product ID>]/`
 - Canaux : Public, Bêta publique, Bêta développeur, AppleSeed — produits bêta marqués BÊTA, filtre « Bêtas uniquement »
@@ -31,7 +32,8 @@ App macOS native (Swift/SwiftUI, Apple Silicon, macOS 14+, sans aucune dépendan
 - **Apparence** : système / clair / sombre
 - **Dossier de téléchargement** par défaut
 - **Catalogue Apple** : version de macOS détectée, URL de catalogue personnalisée (optionnelle)
-- **Nommage des installers** : préréglages ou modèle personnalisé, avec aperçu
+- **Nommage des installers** et **des IPSW** : préréglages ou modèle personnalisé, avec aperçu
+- **Téléchargements simultanés** : de 1 à 10, les autres attendent dans une file
 
 | Préréglage | Exemple |
 |---|---|

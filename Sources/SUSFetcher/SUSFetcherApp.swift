@@ -76,12 +76,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             let downloads = DownloadManager.shared
             let active = downloads.activeCount
-            let paused = downloads.pausedCount
+            let paused = downloads.pausedCount + downloads.queuedCount
             guard active + paused > 0 else { return .terminateNow }
 
             var parts: [String] = []
             if active > 0 { parts.append(tr("\(active) en cours", "\(active) in progress")) }
-            if paused > 0 { parts.append(tr("\(paused) en pause", "\(paused) paused")) }
+            if paused > 0 { parts.append(tr("\(paused) en attente ou en pause", "\(paused) queued or paused")) }
 
             let alert = NSAlert()
             alert.alertStyle = .warning

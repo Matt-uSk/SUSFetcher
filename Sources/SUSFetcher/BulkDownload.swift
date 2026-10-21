@@ -128,8 +128,8 @@ final class BulkPlan {
                     continue
                 }
                 add(Entry(label: name, icon: item.icon, version: "\(latest.version) (\(latest.build))",
-                          fileName: latest.fileName, size: latest.size, url: latest.url,
-                          kind: .ipsw(latest, device), existing: downloads.existingIPSW(latest),
+                          fileName: downloads.ipswDestination(latest, device: device).lastPathComponent, size: latest.size, url: latest.url,
+                          kind: .ipsw(latest, device), existing: downloads.existingIPSW(latest, device: device),
                           note: latest.signed ? nil : tr("Plus signé par Apple", "No longer signed by Apple")))
             }
         }

@@ -17,6 +17,7 @@ Native macOS app (Swift/SwiftUI, Apple Silicon, macOS 14+, zero dependencies) th
 - “InstallAssistant.pkg” button on each row, double-click, multi-selection (right-click)
 - Downloads page + mini monitor at the bottom of the sidebar: progress, speed, time remaining, **pause / resume**, cancel, retry
 - Confirmation before quitting while downloads are in progress
+- Download queue with a configurable number of simultaneous downloads
 - Files already in the destination folder are detected (**✓ Downloaded**), even renamed (size + checksum), instead of being downloaded again
 - “Other” products: package menu, saved into `<Title> <version> [<Product ID>]/`
 - Channels: Public, Public beta, Developer beta, AppleSeed — beta-only products get a BETA badge, “Betas only” filter
@@ -31,7 +32,8 @@ Native macOS app (Swift/SwiftUI, Apple Silicon, macOS 14+, zero dependencies) th
 - **Appearance**: system / light / dark
 - Default **download folder**
 - **Apple catalog**: detected macOS version, optional custom catalog URL
-- **Installer naming**: presets or custom template, with live preview
+- **Installer naming** and **IPSW naming**: presets or custom template, with live preview
+- **Simultaneous downloads**: 1–10, the rest waits in a queue
 
 | Preset | Example |
 |---|---|

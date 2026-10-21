@@ -467,7 +467,7 @@ struct ProductActionCell: View {
             )
         } else if let active = product.packages.first(where: {
             let s = downloads.state(of: $0.url)
-            return s?.isActive == true || s?.isPaused == true
+            return s?.isPending == true
         }) {
             DownloadControl(
                 state: downloads.state(of: active.url),
@@ -529,6 +529,16 @@ struct DownloadControl: View {
                     .help(tr("Annuler", "Cancel"))
             }
             .help(progressHelp(p))
+
+        case .queued?:
+            HStack(spacing: 6) {
+                Image(systemName: "clock")
+                Text(tr("En attente", "Queued")).font(.caption)
+                Button(action: cancel) { Image(systemName: "xmark.circle.fill") }
+                    .buttonStyle(.borderless)
+                    .help(tr("Annuler", "Cancel"))
+            }
+            .foregroundStyle(.secondary)
 
         case .paused(let p)?:
             HStack(spacing: 6) {

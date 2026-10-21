@@ -84,6 +84,9 @@ struct DownloadsPane: View {
             parts.append(tr("\(downloads.activeCount) en cours", "\(downloads.activeCount) active")
                          + " — \(formatBytes(Int64(downloads.totalSpeed)))/s")
         }
+        if downloads.queuedCount > 0 {
+            parts.append(tr("\(downloads.queuedCount) en attente", "\(downloads.queuedCount) queued"))
+        }
         if downloads.pausedCount > 0 {
             parts.append(tr("\(downloads.pausedCount) en pause", "\(downloads.pausedCount) paused"))
         }
@@ -100,7 +103,7 @@ struct SidebarDownloadsMonitor: View {
 
     private var pending: [DownloadItem] {
         downloads.items
-            .filter { $0.state.isActive || $0.state.isPaused }
+            .filter(\.state.isPending)
             .sorted { $0.createdAt < $1.createdAt }
     }
 
@@ -146,20 +149,27 @@ struct MiniDownloadRow: View {
                 Text(item.title.isEmpty ? item.fileName : item.title)
                     .font(.caption).lineLimit(1).truncationMode(.middle)
                 Spacer(minLength: 4)
-                Button {
-                    item.state.isPaused ? downloads.resume(item.source) : downloads.pause(item.source)
-                } label: {
-                    Image(systemName: item.state.isPaused ? "play.fill" : "pause.fill")
-                        .font(.system(size: 9))
+                if item.state.isQueued {
+                    Image(systemName: "clock").font(.system(size: 9)).foregroundStyle(.secondary)
+                        .help(tr("En attente", "Queued"))
+                } else {
+                    Button {
+                        item.state.isPaused ? downloads.resume(item.source) : downloads.pause(item.source)
+                    } label: {
+                        Image(systemName: item.state.isPaused ? "play.fill" : "pause.fill")
+                            .font(.system(size: 9))
+                    }
+                    .buttonStyle(.borderless)
+                    .help(item.state.isPaused ? tr("Reprendre", "Resume") : tr("Pause", "Pause"))
                 }
-                .buttonStyle(.borderless)
-                .help(item.state.isPaused ? tr("Reprendre", "Resume") : tr("Pause", "Pause"))
             }
             ProgressView(value: p?.fraction ?? 0)
                 .progressViewStyle(.linear)
                 .controlSize(.small)
-                .tint(item.state.isPaused ? .secondary : .accentColor)
-            Text(item.state.isPaused
+                .tint(item.state.isActive ? .accentColor : .secondary)
+            Text(item.state.isQueued
+                 ? tr("En attente", "Queued") + (downloads.queuePosition(of: item.source).map { " (#\($0))" } ?? "")
+                 : item.state.isPaused
                  ? tr("En pause", "Paused") + " — \((p?.fraction ?? 0).formatted(.percent.precision(.fractionLength(0))))"
                  : "\((p?.fraction ?? 0).formatted(.percent.precision(.fractionLength(0)))) — \(formatBytes(p?.received ?? 0)) / \(formatBytes(p?.total ?? 0))")
                 .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
@@ -185,7 +195,7 @@ struct DownloadRow: View {
                 if let p = item.state.progress {
                     ProgressView(value: p.fraction)
                         .progressViewStyle(.linear)
-                        .tint(item.state.isPaused ? .secondary : .accentColor)
+                        .tint(item.state.isActive ? .accentColor : .secondary)
                 }
                 Text(detail).font(.caption).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
                 if let v = item.verification {
@@ -197,6 +207,11 @@ struct DownloadRow: View {
 
             HStack(spacing: 4) {
                 switch item.state {
+                case .queued:
+                    iconButton("pause.fill", tr("Mettre en pause (ne démarrera pas)", "Pause (won't start)")) {
+                        downloads.pause(item.source)
+                    }
+                    iconButton("xmark", tr("Annuler", "Cancel")) { downloads.cancel(item.source) }
                 case .downloading:
                     iconButton("pause.fill", tr("Pause", "Pause")) { downloads.pause(item.source) }
                     iconButton("xmark", tr("Annuler", "Cancel")) { downloads.cancel(item.source) }
@@ -235,6 +250,7 @@ struct DownloadRow: View {
 
     private var icon: String {
         switch item.state {
+        case .queued: "clock.fill"
         case .downloading: "arrow.down.circle.fill"
         case .paused: "pause.circle.fill"
         case .finished: "checkmark.circle.fill"
@@ -244,6 +260,7 @@ struct DownloadRow: View {
 
     private var iconColor: Color {
         switch item.state {
+        case .queued: .secondary
         case .downloading: .accentColor
         case .paused: .secondary
         case .finished: .green
@@ -253,6 +270,9 @@ struct DownloadRow: View {
 
     private var detail: String {
         switch item.state {
+        case .queued:
+            let position = downloads.queuePosition(of: item.source).map { tr(" — position \($0) dans la file", " — #\($0) in queue") } ?? ""
+            return tr("En attente", "Queued") + position + " — " + formatBytes(item.expectedSize)
         case .downloading(let p):
             var s = "\(formatBytes(p.received)) / \(formatBytes(p.total)) — \(formatBytes(Int64(p.bytesPerSecond)))/s"
             if let eta = p.eta, let e = Self.etaFormatter.string(from: eta) {

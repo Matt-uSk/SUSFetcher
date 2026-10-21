@@ -2,6 +2,15 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.7.0] - 2026-10-21
+
+### Added
+- **IPSW file naming**, like installers: original Apple name, readable (`iPhone17Pro-iOS27.0.1.ipsw`), readable + build, identifier + version + build, or a custom template (`{model}` `{identifier}` `{os}` `{version}` `{build}`). Universal Mac IPSWs are named `UniversalMac-…` to avoid duplicating one file under several model names.
+- **Download queue**: Settings → Downloads → *Simultaneous downloads* (1–10, default 3). Extra downloads wait as **Queued** (with their position) and start automatically in order; queued items can be paused or cancelled. Resumed downloads also go through the queue.
+
+### Changed
+- Settings window reorganized into tabs: General, Downloads, Naming, Catalog.
+
 ## [1.6.0] - 2026-10-21
 
 ### Added
