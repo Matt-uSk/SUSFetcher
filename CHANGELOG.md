@@ -5,7 +5,9 @@ All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://k
 ## [1.6.0] - 2026-10-21
 
 ### Added
-- **Already-downloaded detection**: when a file with the same name and size is already in the destination folder, the row shows **✓ Downloaded** (click to reveal in Finder, right-click → Download Again) instead of downloading it again. Applies to installers, “Other” packages and IPSW files; double-click and multi-selection skip files already present.
+- **Already-downloaded detection**: when the file is already in the destination folder, the row shows **✓ Downloaded** (click to reveal in Finder, right-click → Download Again) instead of downloading it again. Applies to installers, “Other” packages and IPSW files; double-click and multi-selection skip files already present.
+- **Renamed files are recognized too**: `.pkg` / `.ipsw` files of the exact same size anywhere in the destination folder are checked by checksum (Apple catalog SHA-1 “Digest”, ipsw.me SHA-256 / Apple SHA-1). Checksums are computed once in the background and cached.
+- InstallAssistant and catalog packages are now **verified by SHA-1** after download, like IPSW files.
 - **Download Latest Versions…** (right-click a collection's title): resolves the latest version of every item — newest InstallAssistant, newest package set, latest *signed* IPSW (shared Mac IPSWs listed once) — and shows a summary before starting: files, sizes, status (to download / already present / not found), total size, free disk space with a warning when it's not enough, and an option to re-download files already present.
 
 ## [1.5.0] - 2026-10-20

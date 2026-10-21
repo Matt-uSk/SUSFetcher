@@ -112,6 +112,7 @@ struct ContentView: View {
         .task {
             if catalog.products.isEmpty { catalog.reload() }
             IPSWModel.shared.loadDevicesIfNeeded()
+            LocalFiles.shared.rescan()
         }
         .onChange(of: catalog.channel) { catalog.reload() }
         .onChange(of: state.sidebar) { state.selection.removeAll() }
@@ -232,7 +233,10 @@ struct ContentView: View {
                            "Only show products missing from the public catalog"))
             }
             ToolbarItem {
-                Button { catalog.reload() } label: {
+                Button {
+                    catalog.reload()
+                    LocalFiles.shared.rescan()
+                } label: {
                     Label(tr("Recharger", "Reload"), systemImage: "arrow.clockwise")
                 }
                 .disabled(catalog.isLoading)
@@ -610,6 +614,16 @@ struct StatusBar: View {
             }
 
             Spacer()
+
+            if LocalFiles.shared.hashingCount > 0 {
+                HStack(spacing: 4) {
+                    ProgressView().controlSize(.mini)
+                    Text(tr("Identification des fichiers locaux…", "Identifying local files…"))
+                }
+                .foregroundStyle(.secondary)
+                .help(tr("Calcul des empreintes des fichiers de même taille, pour reconnaître les fichiers renommés.",
+                         "Hashing files of matching size to recognize renamed files."))
+            }
 
             if downloads.pendingCount > 0 {
                 Button {

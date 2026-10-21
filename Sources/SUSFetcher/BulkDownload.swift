@@ -56,7 +56,25 @@ final class BulkPlan {
 
     // MARK: Résolution
 
+    private(set) var identifyingLocalFiles = false
+
+    /// Résout les éléments, puis attend l'identification des fichiers locaux (empreintes)
+    /// et recommence pour que les fichiers renommés soient bien reconnus comme présents.
     func build(from collection: ItemCollection) async {
+        entries = await resolve(collection)
+        try? await Task.sleep(for: .milliseconds(300))      // laisse démarrer les calculs d'empreinte
+        if LocalFiles.shared.hashingCount > 0 {
+            identifyingLocalFiles = true
+            while LocalFiles.shared.hashingCount > 0 {
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+            identifyingLocalFiles = false
+            entries = await resolve(collection)
+        }
+        isLoading = false
+    }
+
+    private func resolve(_ collection: ItemCollection) async -> [Entry] {
         let downloads = DownloadManager.shared
         let catalog = CatalogModel.shared
         var result: [Entry] = []
@@ -115,8 +133,7 @@ final class BulkPlan {
                           note: latest.signed ? nil : tr("Plus signé par Apple", "No longer signed by Apple")))
             }
         }
-        entries = result
-        isLoading = false
+        return result
     }
 
     // MARK: Lancement
@@ -176,7 +193,10 @@ struct BulkDownloadView: View {
             }
 
             if plan.isLoading {
-                ProgressView(tr("Recherche des dernières versions…", "Looking up the latest versions…"))
+                ProgressView(plan.identifyingLocalFiles
+                             ? tr("Identification des fichiers déjà présents (empreintes)…",
+                                  "Identifying files already present (checksums)…")
+                             : tr("Recherche des dernières versions…", "Looking up the latest versions…"))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(plan.entries) { entry in
@@ -273,6 +293,10 @@ struct BulkEntryRow: View {
                 }
                 if !entry.fileName.isEmpty {
                     Text(entry.fileName).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+                }
+                if let existing = entry.existing, existing.lastPathComponent != entry.fileName {
+                    Text(tr("Présent sous le nom : ", "Present as: ") + existing.lastPathComponent)
+                        .font(.caption).foregroundStyle(.green).lineLimit(1)
                 }
                 if let note = entry.note {
                     Text(note).font(.caption).foregroundStyle(.orange)

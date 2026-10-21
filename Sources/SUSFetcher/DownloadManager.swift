@@ -85,7 +85,10 @@ final class DownloadManager {
     private(set) var items: [DownloadItem] = []
 
     var destinationFolder: URL {
-        didSet { UserDefaults.standard.set(destinationFolder.path, forKey: Self.folderKey) }
+        didSet {
+            UserDefaults.standard.set(destinationFolder.path, forKey: Self.folderKey)
+            LocalFiles.shared.rescan()
+        }
     }
 
     @ObservationIgnored private let bridge = DownloadBridge()
@@ -134,12 +137,14 @@ final class DownloadManager {
     func downloadInstaller(_ product: SUProduct) {
         guard let pkg = product.installAssistant else { return }
         start(pkg, to: installerDestination(product),
-              title: "\(product.displayTitle) \(product.versionString)".trimmingCharacters(in: .whitespaces))
+              title: "\(product.displayTitle) \(product.versionString)".trimmingCharacters(in: .whitespaces),
+              checksum: pkg.sha1.map { .init(algorithm: .sha1, value: $0) })
     }
 
     /// N'importe quel paquet d'un produit, rangé dans un sous-dossier par produit.
     func download(_ pkg: SUPackage, of product: SUProduct) {
-        start(pkg, to: packageDestination(pkg, of: product), title: product.displayTitle)
+        start(pkg, to: packageDestination(pkg, of: product), title: product.displayTitle,
+              checksum: pkg.sha1.map { .init(algorithm: .sha1, value: $0) })
     }
 
     /// IPSW, enregistré dans <dossier>/IPSW/<nom d'origine Apple>, avec vérification d'empreinte.
@@ -176,17 +181,22 @@ final class DownloadManager {
         return url
     }
 
+    // Chemin attendu d'abord (immédiat), sinon recherche par taille + empreinte (fichier renommé).
+
     func existingInstaller(_ product: SUProduct) -> URL? {
         guard let pkg = product.installAssistant else { return nil }
         return Self.existingFile(at: installerDestination(product), expectedSize: pkg.size)
+            ?? LocalFiles.shared.match(size: pkg.size, sha1: pkg.sha1, sha256: nil)
     }
 
     func existingPackage(_ pkg: SUPackage, of product: SUProduct) -> URL? {
         Self.existingFile(at: packageDestination(pkg, of: product), expectedSize: pkg.size)
+            ?? LocalFiles.shared.match(size: pkg.size, sha1: pkg.sha1, sha256: nil)
     }
 
     func existingIPSW(_ firmware: IPSWFirmware) -> URL? {
         Self.existingFile(at: ipswDestination(firmware), expectedSize: firmware.size)
+            ?? LocalFiles.shared.match(size: firmware.size, sha1: firmware.sha1, sha256: firmware.sha256)
     }
 
     func downloadAll(of product: SUProduct) {
@@ -330,6 +340,7 @@ final class DownloadManager {
         switch result {
         case .success(let file):
             set(source, .finished(file))
+            LocalFiles.shared.rescan()
             _ = NSApp.requestUserAttention(.informationalRequest)
             if let expected = item(source)?.checksum, !expected.value.isEmpty {
                 verify(source, file: file, expected: expected)

@@ -33,6 +33,7 @@ enum CatalogChannel: String, CaseIterable, Identifiable, Sendable {
 struct SUPackage: Identifiable, Hashable, Sendable {
     let url: URL
     let size: Int64
+    var sha1: String? = nil      // « Digest » du catalogue Apple
     var id: URL { url }
     var fileName: String { url.lastPathComponent }
 }

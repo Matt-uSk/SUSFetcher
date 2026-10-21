@@ -151,7 +151,7 @@ actor CatalogService {
             let packages: [SUPackage] = (p["Packages"] as? [[String: Any]] ?? []).compactMap { d in
                 guard let s = d["URL"] as? String, let url = URL(string: s) else { return nil }
                 let size = (d["Size"] as? NSNumber)?.int64Value ?? 0
-                return SUPackage(url: url, size: size)
+                return SUPackage(url: url, size: size, sha1: d["Digest"] as? String)
             }
             guard !packages.isEmpty else { continue }
 
