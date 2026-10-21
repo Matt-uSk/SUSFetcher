@@ -4,6 +4,8 @@ import Observation
 @Observable
 @MainActor
 final class CatalogModel {
+    static let shared = CatalogModel()
+
     private static let channelKey = "catalogChannel"
 
     var channel: CatalogChannel

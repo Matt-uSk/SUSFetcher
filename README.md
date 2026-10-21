@@ -17,10 +17,11 @@ Native macOS app (Swift/SwiftUI, Apple Silicon, macOS 14+, zero dependencies) th
 - “InstallAssistant.pkg” button on each row, double-click, multi-selection (right-click)
 - Downloads page + mini monitor at the bottom of the sidebar: progress, speed, time remaining, **pause / resume**, cancel, retry
 - Confirmation before quitting while downloads are in progress
+- Files already in the destination folder are detected (**✓ Downloaded**) instead of being downloaded again
 - “Other” products: package menu, saved into `<Title> <version> [<Product ID>]/`
 - Channels: Public, Public beta, Developer beta, AppleSeed — beta-only products get a BETA badge, “Betas only” filter
 - Search by title / version / build / Product ID
-- **Collections**: your own renamable, reorderable sidebar sections to group macOS lines (e.g. “macOS Tahoe”, always up to date) and iPhone / iPad / Mac models
+- **Collections**: your own renamable, reorderable sidebar sections to group macOS lines (e.g. “macOS Tahoe”, always up to date) and iPhone / iPad / Mac models — with **Download Latest Versions…** and a size / disk-space summary before starting
 - **Firmwares (IPSW)** for iPhone, iPad and Apple Silicon Macs, based on [ipsw.me](https://ipsw.me): models list, versions with Apple signing status, “Signed only” filter, one-click download into `IPSW/` with **automatic checksum verification**. If ipsw.me is unreachable, the app falls back to its last saved copy, then to Apple's official restore lists (latest signed version)
 - Metadata (.dist) cached in `~/Library/Application Support/SUSFetcher/`
 

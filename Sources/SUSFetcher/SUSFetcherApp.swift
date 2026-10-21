@@ -7,7 +7,7 @@ struct SUSFetcherApp: App {
     // Pas de @State ni d'@Environment : avec le SDK macOS 27, @State est une macro dont le plugin
     // n'existe que dans Xcode, et les @Environment(Observable) crashent dans les cellules de Table.
     // La struct App n'est instanciée qu'une fois, des `let` suffisent.
-    private let catalog = CatalogModel()
+    private let catalog = CatalogModel.shared
     private let downloads = DownloadManager.shared
     private let viewState = ViewState.shared
     private let settings = AppSettings.shared

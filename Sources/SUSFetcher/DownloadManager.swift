@@ -133,19 +133,60 @@ final class DownloadManager {
     /// One-click : InstallAssistant.pkg renommé avec version + build.
     func downloadInstaller(_ product: SUProduct) {
         guard let pkg = product.installAssistant else { return }
-        let name = product.installAssistantFileName(template: AppSettings.shared.installerTemplate)
-        start(pkg, to: destinationFolder.appending(path: name),
+        start(pkg, to: installerDestination(product),
               title: "\(product.displayTitle) \(product.versionString)".trimmingCharacters(in: .whitespaces))
     }
 
     /// N'importe quel paquet d'un produit, rangé dans un sous-dossier par produit.
     func download(_ pkg: SUPackage, of product: SUProduct) {
+        start(pkg, to: packageDestination(pkg, of: product), title: product.displayTitle)
+    }
+
+    /// IPSW, enregistré dans <dossier>/IPSW/<nom d'origine Apple>, avec vérification d'empreinte.
+    func downloadIPSW(_ firmware: IPSWFirmware, device: IPSWDevice) {
+        start(SUPackage(url: firmware.url, size: firmware.size), to: ipswDestination(firmware),
+              title: "\(device.name) — \(firmware.version) (\(firmware.build))",
+              checksum: firmware.checksum)
+    }
+
+    // MARK: Destinations & fichiers déjà présents
+
+    func installerDestination(_ product: SUProduct) -> URL {
+        destinationFolder.appending(path: product.installAssistantFileName(template: AppSettings.shared.installerTemplate))
+    }
+
+    func packageDestination(_ pkg: SUPackage, of product: SUProduct) -> URL {
         let folderName = "\(product.displayTitle) \(product.versionString) [\(product.id)]"
             .replacingOccurrences(of: "/", with: "-")
             .replacingOccurrences(of: ":", with: "-")
             .replacingOccurrences(of: "  ", with: " ")
-        let folder = destinationFolder.appending(path: folderName, directoryHint: .isDirectory)
-        start(pkg, to: folder.appending(path: pkg.fileName), title: product.displayTitle)
+        return destinationFolder.appending(path: folderName, directoryHint: .isDirectory)
+            .appending(path: pkg.fileName)
+    }
+
+    func ipswDestination(_ firmware: IPSWFirmware) -> URL {
+        destinationFolder.appending(path: "IPSW", directoryHint: .isDirectory).appending(path: firmware.fileName)
+    }
+
+    /// Fichier déjà présent et complet : même nom, même taille (si la taille attendue est connue).
+    nonisolated static func existingFile(at url: URL, expectedSize: Int64) -> URL? {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = (attrs[.size] as? NSNumber)?.int64Value, size > 0 else { return nil }
+        if expectedSize > 0, size != expectedSize { return nil }
+        return url
+    }
+
+    func existingInstaller(_ product: SUProduct) -> URL? {
+        guard let pkg = product.installAssistant else { return nil }
+        return Self.existingFile(at: installerDestination(product), expectedSize: pkg.size)
+    }
+
+    func existingPackage(_ pkg: SUPackage, of product: SUProduct) -> URL? {
+        Self.existingFile(at: packageDestination(pkg, of: product), expectedSize: pkg.size)
+    }
+
+    func existingIPSW(_ firmware: IPSWFirmware) -> URL? {
+        Self.existingFile(at: ipswDestination(firmware), expectedSize: firmware.size)
     }
 
     func downloadAll(of product: SUProduct) {

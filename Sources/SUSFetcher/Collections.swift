@@ -290,6 +290,11 @@ struct CollectionSection: View {
             }
             .contentShape(Rectangle())
             .contextMenu {
+                Button(tr("Télécharger les dernières versions…", "Download Latest Versions…")) {
+                    BulkDownloadWindow.shared.show(collection)
+                }
+                .disabled(collection.items.isEmpty)
+                Divider()
                 Button(tr("Renommer…", "Rename…")) { store.renameInteractively(collection.id) }
                 Divider()
                 Button(tr("Monter", "Move Up")) { store.moveCollection(collection.id, by: -1) }

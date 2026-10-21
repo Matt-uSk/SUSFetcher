@@ -393,7 +393,8 @@ struct ProductTable: View {
         .contextMenu(forSelectionType: SUProduct.ID.self) { ids in
             contextMenu(for: products.filter { ids.contains($0.id) })
         } primaryAction: { ids in
-            products.filter { ids.contains($0.id) }.forEach(downloads.downloadInstaller)
+            products.filter { ids.contains($0.id) && downloads.existingInstaller($0) == nil }
+                .forEach(downloads.downloadInstaller)
         }
     }
 
@@ -424,7 +425,8 @@ struct ProductTable: View {
             let installers = selected.filter { $0.installAssistant != nil }
             if !installers.isEmpty {
                 Button(tr("Télécharger \(installers.count) InstallAssistant.pkg", "Download \(installers.count) InstallAssistant.pkg")) {
-                    installers.forEach(downloads.downloadInstaller)
+                    installers.filter { downloads.existingInstaller($0) == nil }
+                        .forEach(downloads.downloadInstaller)
                 }
             }
             Button(tr("Copier les Product IDs", "Copy Product IDs")) { copy(selected.map(\.id).joined(separator: "\n")) }
@@ -448,6 +450,8 @@ struct ProductActionCell: View {
             DownloadControl(
                 state: downloads.state(of: pkg.url),
                 idleTitle: "InstallAssistant.pkg",
+                existing: downloads.existingInstaller(product),
+                redownload: { downloads.downloadInstaller(product) },
                 start: {
                     switch downloads.state(of: pkg.url) {
                     case .paused?: downloads.resume(pkg.url)
@@ -470,11 +474,21 @@ struct ProductActionCell: View {
         } else {
             Menu {
                 ForEach(product.packages) { pkg in
-                    Button("\(pkg.fileName) — \(formatBytes(pkg.size))") { downloads.download(pkg, of: product) }
+                    if let file = downloads.existingPackage(pkg, of: product) {
+                        Button("✓ \(pkg.fileName) — " + tr("déjà présent", "already downloaded")) {
+                            NSWorkspace.shared.activateFileViewerSelecting([file])
+                        }
+                    } else {
+                        Button("\(pkg.fileName) — \(formatBytes(pkg.size))") { downloads.download(pkg, of: product) }
+                    }
                 }
                 if product.packages.count > 1 {
                     Divider()
-                    Button(tr("Tous les paquets", "All packages")) { downloads.downloadAll(of: product) }
+                    Button(tr("Tous les paquets manquants", "All missing packages")) {
+                        for pkg in product.packages where downloads.existingPackage(pkg, of: product) == nil {
+                            downloads.download(pkg, of: product)
+                        }
+                    }
                 }
             } label: {
                 Label(product.packages.count == 1
@@ -491,6 +505,8 @@ struct ProductActionCell: View {
 struct DownloadControl: View {
     let state: DownloadItem.State?
     let idleTitle: String
+    var existing: URL? = nil             // fichier déjà présent dans le dossier de destination
+    var redownload: () -> Void = {}
     let start: () -> Void
     let cancel: () -> Void
 
@@ -538,10 +554,28 @@ struct DownloadControl: View {
             .help(message)
 
         case nil:
-            Button(action: start) {
-                Label(idleTitle, systemImage: "arrow.down.circle")
+            if let existing {
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([existing])
+                } label: {
+                    Label(tr("Présent", "Downloaded"), systemImage: "checkmark.circle")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.green)
+                .help(tr("Déjà dans le dossier de destination — clic droit pour retélécharger\n",
+                         "Already in the destination folder — right-click to download again\n") + existing.path)
+                .contextMenu {
+                    Button(tr("Afficher dans le Finder", "Show in Finder")) {
+                        NSWorkspace.shared.activateFileViewerSelecting([existing])
+                    }
+                    Button(tr("Retélécharger", "Download Again"), action: redownload)
+                }
+            } else {
+                Button(action: start) {
+                    Label(idleTitle, systemImage: "arrow.down.circle")
+                }
+                .buttonStyle(.borderless)
             }
-            .buttonStyle(.borderless)
         }
     }
 

@@ -387,6 +387,20 @@ final class IPSWModel {
         if let identifier { loadFirmwares(identifier, force: false) }
     }
 
+    /// Firmwares d'un appareil, chargés si besoin (utilisé par le téléchargement groupé).
+    func ensureFirmwares(_ identifier: String) async -> [IPSWFirmware] {
+        if let list = firmwares[identifier] { return list }
+        do {
+            let result = try await service.firmwares(for: identifier)
+            firmwares[identifier] = result.firmwares
+            firmwareSources[identifier] = result.source
+            return result.firmwares
+        } catch {
+            firmwareErrors[identifier] = (error as? IPSWError)?.message ?? error.localizedDescription
+            return []
+        }
+    }
+
     func loadFirmwares(_ identifier: String, force: Bool) {
         guard force || firmwares[identifier] == nil, !loadingFirmwares.contains(identifier) else { return }
         loadingFirmwares.insert(identifier)
@@ -773,6 +787,8 @@ struct IPSWActionCell: View {
         DownloadControl(
             state: downloads.state(of: firmware.url),
             idleTitle: "IPSW",
+            existing: downloads.existingIPSW(firmware),
+            redownload: { Self.start(firmware, device: device, downloads: downloads) },
             start: {
                 switch downloads.state(of: firmware.url) {
                 case .paused?: downloads.resume(firmware.url)
@@ -784,13 +800,8 @@ struct IPSWActionCell: View {
         )
     }
 
-    /// Enregistre dans <dossier>/IPSW/<nom d'origine Apple>.
     @MainActor
     static func start(_ f: IPSWFirmware, device: IPSWDevice, downloads: DownloadManager) {
-        let folder = downloads.destinationFolder.appending(path: "IPSW", directoryHint: .isDirectory)
-        downloads.download(url: f.url, size: f.size,
-                           to: folder.appending(path: f.fileName),
-                           title: "\(device.name) — \(f.version) (\(f.build))",
-                           checksum: f.checksum)
+        downloads.downloadIPSW(f, device: device)
     }
 }
