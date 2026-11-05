@@ -39,6 +39,7 @@ final class AutoSync {
         static let frequency = "autoSyncFrequency"
         static let deleteOld = "autoSyncDeleteOld"
         static let lastSync = "autoSyncLast"
+        static let lastByCollection = "autoSyncLastByCollection"
     }
 
     var frequency: Frequency = Frequency(rawValue: UserDefaults.standard.integer(forKey: Key.frequency)) ?? .daily {
@@ -53,6 +54,9 @@ final class AutoSync {
     }
 
     private(set) var lastSync: Date? = UserDefaults.standard.object(forKey: Key.lastSync) as? Date
+    /// Dernière synchro par collection (UUID → timestamp).
+    private(set) var lastSyncByCollection: [String: Double] =
+        UserDefaults.standard.dictionary(forKey: Key.lastByCollection) as? [String: Double] ?? [:]
     private(set) var isSyncing = false
     private(set) var lastSummary: String?
     private(set) var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled
@@ -64,9 +68,27 @@ final class AutoSync {
 
     var hasSyncedCollections: Bool { CollectionsStore.shared.collections.contains(where: \.autoSync) }
 
+    // MARK: Réglages effectifs par collection
+
+    func frequency(for collection: ItemCollection) -> Frequency {
+        collection.syncFrequency.flatMap(Frequency.init(rawValue:)) ?? frequency
+    }
+
+    func deletesOldVersions(_ collectionID: UUID) -> Bool {
+        CollectionsStore.shared.collection(collectionID)?.deleteOldVersions ?? deleteOldVersions
+    }
+
+    func lastSync(of collectionID: UUID) -> Date? {
+        lastSyncByCollection[collectionID.uuidString].map { Date(timeIntervalSince1970: $0) }
+    }
+
+    func nextSync(of collection: ItemCollection) -> Date {
+        (lastSync(of: collection.id) ?? .distantPast).addingTimeInterval(frequency(for: collection).interval)
+    }
+
+    /// Prochaine synchro, toutes collections confondues.
     var nextSync: Date? {
-        guard hasSyncedCollections else { return nil }
-        return (lastSync ?? .distantPast).addingTimeInterval(frequency.interval)
+        CollectionsStore.shared.collections.filter(\.autoSync).map(nextSync(of:)).min()
     }
 
     // MARK: Planification
@@ -84,18 +106,25 @@ final class AutoSync {
         }
     }
 
+    /// Synchronise les collections dont la fréquence est échue.
     func tick() {
-        guard !isSyncing, let next = nextSync, next <= .now else { return }
-        Task { await sync() }
+        guard !isSyncing else { return }
+        let due = CollectionsStore.shared.collections.filter { $0.autoSync && nextSync(of: $0) <= .now }
+        guard !due.isEmpty else { return }
+        Task { await sync(collections: Set(due.map(\.id))) }
     }
 
     // MARK: Synchronisation
 
     /// Synchronise toutes les collections en mode auto, ou une seule (`only`).
     func sync(only collectionID: UUID? = nil) async {
+        await sync(collections: collectionID.map { [$0] })
+    }
+
+    private func sync(collections ids: Set<UUID>?) async {
         guard !isSyncing else { return }
         let targets = CollectionsStore.shared.collections.filter {
-            $0.autoSync && (collectionID == nil || $0.id == collectionID)
+            $0.autoSync && (ids == nil || ids!.contains($0.id))
         }
         guard !targets.isEmpty else { return }
 
@@ -128,6 +157,7 @@ final class AutoSync {
             let count = plan.toDownload.count
             plan.start(showDownloads: false)
             started += count
+            lastSyncByCollection[collection.id.uuidString] = Date().timeIntervalSince1970
             if count > 0 {
                 lines.append(tr("\(collection.name) : \(count) nouvelle(s) version(s) (\(formatBytes(plan.totalBytes)))",
                                 "\(collection.name): \(count) new version(s) (\(formatBytes(plan.totalBytes)))"))
@@ -135,10 +165,9 @@ final class AutoSync {
         }
         manifest.save()
 
-        if collectionID == nil {
-            lastSync = .now
-            UserDefaults.standard.set(lastSync, forKey: Key.lastSync)
-        }
+        lastSync = .now
+        UserDefaults.standard.set(lastSync, forKey: Key.lastSync)
+        UserDefaults.standard.set(lastSyncByCollection, forKey: Key.lastByCollection)
         lastSummary = started == 0
             ? tr("Tout est à jour.", "Everything is up to date.")
             : lines.joined(separator: "\n")
@@ -173,8 +202,14 @@ final class AutoSync {
         for key in Array(manifest.latestPath.keys) { prune(key) }
     }
 
+    /// Après activation de la suppression sur une collection.
+    func pruneCollection(_ id: UUID) {
+        for key in Array(manifest.latestPath.keys) where key.hasPrefix(id.uuidString + "|") { prune(key) }
+    }
+
     private func prune(_ key: String) {
-        guard deleteOldVersions,
+        guard let collectionID = UUID(uuidString: String(key.prefix { $0 != "|" })),
+              deletesOldVersions(collectionID),
               let latest = manifest.latestPath[key],
               FileManager.default.fileExists(atPath: latest),
               let records = manifest.records[key] else { return }
@@ -266,12 +301,12 @@ struct AutoSyncSettingsSection: View {
 
     var body: some View {
         Section {
-            Picker(tr("Fréquence", "Frequency"), selection: Binding(sync, \.frequency)) {
+            Picker(tr("Fréquence par défaut", "Default frequency"), selection: Binding(sync, \.frequency)) {
                 ForEach(AutoSync.Frequency.allCases) { Text($0.label).tag($0) }
             }
             Toggle(isOn: Binding(sync, \.deleteOldVersions)) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(tr("Supprimer les anciennes versions", "Delete old versions"))
+                    Text(tr("Supprimer les anciennes versions (par défaut)", "Delete old versions (default)"))
                     Text(tr("Mises à la Corbeille, une fois la nouvelle version téléchargée et vérifiée. Seuls les fichiers téléchargés par la synchronisation sont concernés.",
                             "Moved to the Trash once the new version is downloaded and verified. Only files downloaded by sync are affected."))
                         .font(.caption)
@@ -290,18 +325,25 @@ struct AutoSyncSettingsSection: View {
         } header: {
             Text(tr("Synchronisation automatique", "Automatic sync"))
         } footer: {
-            Text(tr("Active la synchronisation par collection : clic droit sur le titre d'une collection › Synchronisation automatique.",
-                    "Enable sync per collection: right-click a collection's title › Automatic Sync."))
+            Text(tr("La synchronisation s'active par collection, avec la roue crantée ⚙︎ au bout de son titre dans la barre latérale. Chaque collection peut aussi avoir sa propre fréquence et son propre choix pour les anciennes versions ; sinon ces réglages s'appliquent.",
+                    "Sync is enabled per collection with the ⚙︎ button at the end of its title in the sidebar. Each collection can also have its own frequency and old-versions choice; otherwise these settings apply."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
 
         Section(tr("État", "Status")) {
             let synced = CollectionsStore.shared.collections.filter(\.autoSync)
-            LabeledContent(tr("Collections synchronisées", "Synced collections")) {
-                Text(synced.isEmpty ? tr("Aucune", "None") : synced.map(\.name).joined(separator: ", "))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+            if synced.isEmpty {
+                LabeledContent(tr("Collections synchronisées", "Synced collections")) {
+                    Text(tr("Aucune", "None")).foregroundStyle(.secondary)
+                }
+            }
+            ForEach(synced) { c in
+                LabeledContent(c.name) {
+                    Text(sync.frequency(for: c).label
+                         + (sync.deletesOldVersions(c.id) ? tr(" · corbeille", " · trash") : ""))
+                        .foregroundStyle(.secondary)
+                }
             }
             LabeledContent(tr("Dernière synchronisation", "Last sync")) {
                 Text(sync.lastSync.map(format) ?? "—").foregroundStyle(.secondary)

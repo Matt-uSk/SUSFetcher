@@ -5,7 +5,8 @@ All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://k
 ## [1.8.0] - 2026-11-05
 
 ### Added
-- **Automatic sync per collection** (right-click a collection's title › *Automatic Sync*, shown with ↻): at the chosen interval the app reloads the catalog and firmwares, finds the latest version of every item and downloads what's missing through the queue. *Sync Now* is also available per collection and in Settings.
+- **Collection settings button** (⚙︎ at the end of each collection's title in the sidebar, also on right-click): rename, automatic sync, **per-collection frequency** and **old-versions choice** (or use the defaults from Settings), Sync Now with last sync date, Download Latest Versions, move, delete.
+- **Automatic sync per collection** (⚙︎ › *Automatic Sync*, shown with ↻): at the chosen interval the app reloads the catalog and firmwares, finds the latest version of every item and downloads what's missing through the queue. *Sync Now* is also available per collection and in Settings.
 - Settings → **Sync** tab: frequency (hourly → weekly), **delete old versions** option, *Open SUS Fetcher at login*, last / next sync and a summary of the last run.
 - Old versions are **moved to the Trash** only once the new version is downloaded and its checksum verified, and only for files the sync itself downloaded — your own files are never touched, and a file still current for another synced item (e.g. the universal Mac IPSW) is kept.
 - macOS notification when a sync starts new downloads.

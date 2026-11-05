@@ -52,6 +52,10 @@ struct ItemCollection: Identifiable, Codable, Hashable, Sendable {
     var items: [Favorite] = []
     /// Synchronisation automatique : télécharge les dernières versions à intervalle régulier.
     var autoSync = false
+    /// Fréquence propre (secondes, cf. AutoSync.Frequency) ; nil = réglage général.
+    var syncFrequency: Int? = nil
+    /// Suppression des anciennes versions propre ; nil = réglage général.
+    var deleteOldVersions: Bool? = nil
 
     init(id: UUID = UUID(), name: String, items: [Favorite] = [], autoSync: Bool = false) {
         self.id = id
@@ -67,6 +71,8 @@ struct ItemCollection: Identifiable, Codable, Hashable, Sendable {
         name = try c.decode(String.self, forKey: .name)
         items = try c.decodeIfPresent([Favorite].self, forKey: .items) ?? []
         autoSync = try c.decodeIfPresent(Bool.self, forKey: .autoSync) ?? false
+        syncFrequency = try c.decodeIfPresent(Int.self, forKey: .syncFrequency)
+        deleteOldVersions = try c.decodeIfPresent(Bool.self, forKey: .deleteOldVersions)
     }
 
     func contains(_ favorite: Favorite) -> Bool { items.contains { $0.id == favorite.id } }
@@ -139,6 +145,20 @@ final class CollectionsStore {
             AutoSync.shared.requestNotificationPermission()
             AutoSync.shared.tick()
         }
+    }
+
+    func setSyncFrequency(_ id: UUID, _ seconds: Int?) {
+        guard let i = index(id) else { return }
+        collections[i].syncFrequency = seconds
+        save()
+        AutoSync.shared.tick()
+    }
+
+    func setDeleteOldVersions(_ id: UUID, _ value: Bool?) {
+        guard let i = index(id) else { return }
+        collections[i].deleteOldVersions = value
+        save()
+        if value == true { AutoSync.shared.pruneCollection(id) }
     }
 
     func moveCollection(_ id: UUID, by offset: Int) {
@@ -314,37 +334,116 @@ struct CollectionSection: View {
         } header: {
             HStack(spacing: 4) {
                 Text(collection.name)
+                    .lineLimit(1)
                 if collection.autoSync {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.caption2)
-                        .help(tr("Synchronisation automatique activée", "Automatic sync enabled"))
+                        .help(syncHelp)
                 }
-                Spacer()
+                Spacer(minLength: 4)
+                Menu {
+                    CollectionMenuItems(collection: collection, isFirst: isFirst, isLast: isLast)
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.caption)
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help(tr("Réglages de la collection", "Collection settings"))
             }
             .contentShape(Rectangle())
             .contextMenu {
-                Button(tr("Télécharger les dernières versions…", "Download Latest Versions…")) {
-                    BulkDownloadWindow.shared.show(collection)
-                }
-                .disabled(collection.items.isEmpty)
-                Toggle(tr("Synchronisation automatique", "Automatic Sync"),
-                       isOn: Binding(get: { collection.autoSync },
-                                     set: { store.setAutoSync(collection.id, $0) }))
-                if collection.autoSync {
-                    Button(tr("Synchroniser maintenant", "Sync Now")) {
-                        Task { await AutoSync.shared.sync(only: collection.id) }
-                    }
-                }
-                Divider()
-                Button(tr("Renommer…", "Rename…")) { store.renameInteractively(collection.id) }
-                Divider()
-                Button(tr("Monter", "Move Up")) { store.moveCollection(collection.id, by: -1) }
-                    .disabled(isFirst)
-                Button(tr("Descendre", "Move Down")) { store.moveCollection(collection.id, by: 1) }
-                    .disabled(isLast)
-                Divider()
-                Button(tr("Supprimer la collection…", "Delete Collection…")) { store.deleteInteractively(collection.id) }
+                CollectionMenuItems(collection: collection, isFirst: isFirst, isLast: isLast)
             }
         }
+    }
+}
+
+extension CollectionSection {
+    @MainActor fileprivate var syncHelp: String {
+        let sync = AutoSync.shared
+        var text = tr("Synchronisation automatique : ", "Automatic sync: ") + sync.frequency(for: collection).label.lowercased()
+        if let last = sync.lastSync(of: collection.id) {
+            text += "\n" + tr("Dernière : ", "Last: ")
+                + last.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(AppSettings.shared.locale))
+        }
+        return text
+    }
+}
+
+/// Menu de réglages d'une collection (roue crantée et clic droit sur le titre).
+struct CollectionMenuItems: View {
+    let collection: ItemCollection
+    let isFirst: Bool
+    let isLast: Bool
+
+    var body: some View {
+        let store = CollectionsStore.shared
+        let sync = AutoSync.shared
+        let id = collection.id
+
+        Button(tr("Renommer…", "Rename…")) { store.renameInteractively(id) }
+        Divider()
+
+        Toggle(tr("Synchronisation automatique", "Automatic Sync"),
+               isOn: Binding(get: { collection.autoSync }, set: { store.setAutoSync(id, $0) }))
+
+        Menu(tr("Fréquence", "Frequency")) {
+            Picker(tr("Fréquence", "Frequency"), selection: Binding<Int?>(
+                get: { collection.syncFrequency },
+                set: { store.setSyncFrequency(id, $0) })) {
+                Text(tr("Selon les réglages (\(sync.frequency.label.lowercased()))",
+                        "Use settings (\(sync.frequency.label.lowercased()))")).tag(Int?.none)
+                Divider()
+                ForEach(AutoSync.Frequency.allCases) { f in
+                    Text(f.label).tag(Int?.some(f.rawValue))
+                }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        }
+        .disabled(!collection.autoSync)
+
+        Menu(tr("Anciennes versions", "Old Versions")) {
+            Picker(tr("Anciennes versions", "Old Versions"), selection: Binding<Bool?>(
+                get: { collection.deleteOldVersions },
+                set: { store.setDeleteOldVersions(id, $0) })) {
+                Text(tr("Selon les réglages (\(sync.deleteOldVersions ? "corbeille" : "conserver"))",
+                        "Use settings (\(sync.deleteOldVersions ? "trash" : "keep"))")).tag(Bool?.none)
+                Divider()
+                Text(tr("Conserver", "Keep")).tag(Bool?.some(false))
+                Text(tr("Mettre à la Corbeille", "Move to Trash")).tag(Bool?.some(true))
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        }
+        .disabled(!collection.autoSync)
+
+        if collection.autoSync {
+            Button(tr("Synchroniser maintenant", "Sync Now")) {
+                Task { await sync.sync(only: id) }
+            }
+            .disabled(sync.isSyncing || collection.items.isEmpty)
+            if let last = sync.lastSync(of: id) {
+                Text(tr("Dernière synchro : ", "Last sync: ")
+                     + last.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened)
+                        .locale(AppSettings.shared.locale)))
+            }
+        }
+        Divider()
+
+        Button(tr("Télécharger les dernières versions…", "Download Latest Versions…")) {
+            BulkDownloadWindow.shared.show(collection)
+        }
+        .disabled(collection.items.isEmpty)
+        Divider()
+
+        Button(tr("Monter", "Move Up")) { store.moveCollection(id, by: -1) }
+            .disabled(isFirst)
+        Button(tr("Descendre", "Move Down")) { store.moveCollection(id, by: 1) }
+            .disabled(isLast)
+        Divider()
+        Button(tr("Supprimer la collection…", "Delete Collection…")) { store.deleteInteractively(id) }
     }
 }
