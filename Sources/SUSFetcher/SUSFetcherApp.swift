@@ -65,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             AppSettings.shared.applyAppearance()
             Updater.shared.checkAutomaticallyIfNeeded()
+            AutoSync.shared.start()
         }
         NSApp.activate(ignoringOtherApps: true)
     }

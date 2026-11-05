@@ -50,6 +50,24 @@ struct ItemCollection: Identifiable, Codable, Hashable, Sendable {
     var id = UUID()
     var name: String
     var items: [Favorite] = []
+    /// Synchronisation automatique : télécharge les dernières versions à intervalle régulier.
+    var autoSync = false
+
+    init(id: UUID = UUID(), name: String, items: [Favorite] = [], autoSync: Bool = false) {
+        self.id = id
+        self.name = name
+        self.items = items
+        self.autoSync = autoSync
+    }
+
+    // Décodage tolérant : les collections enregistrées avant la synchro n'ont pas `autoSync`.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        items = try c.decodeIfPresent([Favorite].self, forKey: .items) ?? []
+        autoSync = try c.decodeIfPresent(Bool.self, forKey: .autoSync) ?? false
+    }
 
     func contains(_ favorite: Favorite) -> Bool { items.contains { $0.id == favorite.id } }
 }
@@ -110,6 +128,16 @@ final class CollectionsStore {
         save()
         if case .collectionItem(let cid, _)? = ViewState.shared.sidebar, cid == id {
             ViewState.shared.sidebar = .installers
+        }
+    }
+
+    func setAutoSync(_ id: UUID, _ enabled: Bool) {
+        guard let i = index(id) else { return }
+        collections[i].autoSync = enabled
+        save()
+        if enabled {
+            AutoSync.shared.requestNotificationPermission()
+            AutoSync.shared.tick()
         }
     }
 
@@ -284,8 +312,13 @@ struct CollectionSection: View {
             }
             .onMove { store.moveItems(in: collection.id, fromOffsets: $0, toOffset: $1) }
         } header: {
-            HStack {
+            HStack(spacing: 4) {
                 Text(collection.name)
+                if collection.autoSync {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.caption2)
+                        .help(tr("Synchronisation automatique activée", "Automatic sync enabled"))
+                }
                 Spacer()
             }
             .contentShape(Rectangle())
@@ -294,6 +327,14 @@ struct CollectionSection: View {
                     BulkDownloadWindow.shared.show(collection)
                 }
                 .disabled(collection.items.isEmpty)
+                Toggle(tr("Synchronisation automatique", "Automatic Sync"),
+                       isOn: Binding(get: { collection.autoSync },
+                                     set: { store.setAutoSync(collection.id, $0) }))
+                if collection.autoSync {
+                    Button(tr("Synchroniser maintenant", "Sync Now")) {
+                        Task { await AutoSync.shared.sync(only: collection.id) }
+                    }
+                }
                 Divider()
                 Button(tr("Renommer…", "Rename…")) { store.renameInteractively(collection.id) }
                 Divider()

@@ -298,6 +298,10 @@ struct SettingsView: View {
             .formStyle(.grouped)
             .tabItem { Label(tr("Nommage", "Naming"), systemImage: "textformat") }
 
+            Form { AutoSyncSettingsSection(sync: AutoSync.shared) }
+                .formStyle(.grouped)
+                .tabItem { Label(tr("Synchronisation", "Sync"), systemImage: "arrow.triangle.2.circlepath") }
+
             Form { catalogSection }
                 .formStyle(.grouped)
                 .tabItem { Label(tr("Catalogue", "Catalog"), systemImage: "list.bullet.rectangle") }

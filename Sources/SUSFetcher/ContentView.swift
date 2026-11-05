@@ -625,6 +625,14 @@ struct StatusBar: View {
 
             Spacer()
 
+            if AutoSync.shared.isSyncing {
+                HStack(spacing: 4) {
+                    ProgressView().controlSize(.mini)
+                    Text(tr("Synchronisation des collections…", "Syncing collections…"))
+                }
+                .foregroundStyle(.secondary)
+            }
+
             if LocalFiles.shared.hashingCount > 0 {
                 HStack(spacing: 4) {
                     ProgressView().controlSize(.mini)

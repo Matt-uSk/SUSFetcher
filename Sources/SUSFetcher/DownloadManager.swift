@@ -255,6 +255,7 @@ final class DownloadManager {
     }
 
     func cancel(_ url: URL) {
+        AutoSync.shared.downloadFailed(source: url)
         tasks[url]?.cancel()
         tasks[url] = nil
         resumeData[url] = nil
@@ -367,7 +368,10 @@ final class DownloadManager {
             } catch {
                 result = .error(error.localizedDescription)
             }
-            await MainActor.run { DownloadManager.shared.setVerification(source, result) }
+            await MainActor.run {
+                DownloadManager.shared.setVerification(source, result)
+                AutoSync.shared.downloadFinished(source: source, file: file, ok: result == .ok)
+            }
         }
     }
 
@@ -390,6 +394,8 @@ final class DownloadManager {
             _ = NSApp.requestUserAttention(.informationalRequest)
             if let expected = item(source)?.checksum, !expected.value.isEmpty {
                 verify(source, file: file, expected: expected)
+            } else {
+                AutoSync.shared.downloadFinished(source: source, file: file, ok: true)
             }
         case .failure(let error):
             if (error as? URLError)?.code == .cancelled {
@@ -397,6 +403,7 @@ final class DownloadManager {
             } else {
                 set(source, .failed(error.localizedDescription))
             }
+            AutoSync.shared.downloadFailed(source: source)
         }
     }
 }

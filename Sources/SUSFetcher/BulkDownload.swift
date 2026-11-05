@@ -25,6 +25,8 @@ final class BulkPlan {
         let kind: Kind?          // nil : rien trouvé pour cet élément
         let existing: URL?       // déjà présent dans le dossier de destination
         var note: String?
+        /// Éléments de la collection (Favorite.id) qui pointent vers ce fichier.
+        var itemIDs: [String] = []
     }
 
     let collectionName: String
@@ -80,17 +82,23 @@ final class BulkPlan {
         var result: [Entry] = []
         var indexByURL: [URL: Int] = [:]
 
+        var currentItemID = ""
+
         func add(_ entry: Entry) {
             // Un même fichier (ex. IPSW universel Mac) n'est listé qu'une fois.
             if let url = entry.url, let i = indexByURL[url] {
                 result[i].label += ", " + entry.label
+                result[i].itemIDs.append(currentItemID)
                 return
             }
+            var entry = entry
+            entry.itemIDs = [currentItemID]
             if let url = entry.url { indexByURL[url] = result.count }
             result.append(entry)
         }
 
         for item in collection.items {
+            currentItemID = item.id
             switch item {
             case .catalog(let title, _):
                 let candidates = catalog.products.filter { $0.displayTitle == title }
@@ -138,7 +146,7 @@ final class BulkPlan {
 
     // MARK: Lancement
 
-    func start() {
+    func start(showDownloads: Bool = true) {
         let downloads = DownloadManager.shared
         for entry in toDownload {
             switch entry.kind {
@@ -148,7 +156,7 @@ final class BulkPlan {
             case nil: break
             }
         }
-        if !toDownload.isEmpty { ViewState.shared.showDownloads() }
+        if showDownloads, !toDownload.isEmpty { ViewState.shared.showDownloads() }
     }
 }
 

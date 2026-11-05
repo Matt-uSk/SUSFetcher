@@ -387,6 +387,18 @@ final class IPSWModel {
         if let identifier { loadFirmwares(identifier, force: false) }
     }
 
+    /// Recharge les firmwares d'un appareil depuis la source (utilisé par la synchro auto).
+    func refreshFirmwares(_ identifier: String) async {
+        do {
+            let result = try await service.firmwares(for: identifier)
+            firmwares[identifier] = result.firmwares
+            firmwareSources[identifier] = result.source
+            firmwareErrors[identifier] = nil
+        } catch {
+            // On garde la liste déjà connue.
+        }
+    }
+
     /// Firmwares d'un appareil, chargés si besoin (utilisé par le téléchargement groupé).
     func ensureFirmwares(_ identifier: String) async -> [IPSWFirmware] {
         if let list = firmwares[identifier] { return list }

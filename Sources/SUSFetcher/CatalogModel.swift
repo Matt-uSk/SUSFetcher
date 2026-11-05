@@ -36,6 +36,12 @@ final class CatalogModel {
         loadTask = Task { await load(channel) }
     }
 
+    /// Recharge le catalogue et attend la fin (métadonnées comprises). Utilisé par la synchro auto.
+    func refresh() async {
+        reload()
+        await loadTask?.value
+    }
+
     func clearCacheAndReload() {
         Task {
             await service.clearCache()

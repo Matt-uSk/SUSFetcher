@@ -34,6 +34,7 @@ Native macOS app (Swift/SwiftUI, Apple Silicon, macOS 14+, zero dependencies) th
 - **Apple catalog**: detected macOS version, optional custom catalog URL
 - **Installer naming** and **IPSW naming**: presets or custom template, with live preview
 - **Simultaneous downloads**: 1–10, the rest waits in a queue
+- **Automatic sync**: per-collection, at a chosen interval, with optional removal (to the Trash) of old versions it downloaded
 
 | Preset | Example |
 |---|---|

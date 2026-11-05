@@ -34,6 +34,7 @@ App macOS native (Swift/SwiftUI, Apple Silicon, macOS 14+, sans aucune dépendan
 - **Catalogue Apple** : version de macOS détectée, URL de catalogue personnalisée (optionnelle)
 - **Nommage des installers** et **des IPSW** : préréglages ou modèle personnalisé, avec aperçu
 - **Téléchargements simultanés** : de 1 à 10, les autres attendent dans une file
+- **Synchronisation automatique** : par collection, à la fréquence choisie, avec suppression optionnelle (à la Corbeille) des anciennes versions qu'elle a téléchargées
 
 | Préréglage | Exemple |
 |---|---|
