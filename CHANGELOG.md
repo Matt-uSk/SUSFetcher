@@ -2,6 +2,12 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.8.1] - 2026-11-05
+
+### Fixed
+- Updater: more robust download — no cache, automatic second attempt through the GitHub API, checks that the file received is really a zip of the announced size before comparing its SHA-256.
+- Updater: precise error messages (not a zip — likely a proxy / web filter / antivirus page —, wrong size, or both checksums), plus **Download Manually** and **Copy Details** buttons.
+
 ## [1.8.0] - 2026-11-05
 
 ### Added

@@ -25,9 +25,27 @@ final class Updater {
         let tag: String              // "v1.4.1"
         let notes: String
         let pageURL: URL
-        let zipURL: URL?
-        let shaURL: URL?
+        let zip: Asset?
+        let sha: Asset?
+        var zipURL: URL? { zip?.downloadURL }
     }
+
+    /// Fichier attaché à une release : lien public + lien API (secours) + taille annoncée.
+    struct Asset: Sendable {
+        let name: String
+        let downloadURL: URL
+        let apiURL: URL?
+        let size: Int64
+    }
+
+    /// Session dédiée : aucun cache, pour ne jamais réutiliser une réponse intermédiaire.
+    @ObservationIgnored private let updateSession: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        config.urlCache = nil
+        config.timeoutIntervalForRequest = 60
+        return URLSession(configuration: config)
+    }()
 
     enum Status: Equatable {
         case idle, checking, upToDate, downloading, installing
@@ -107,14 +125,17 @@ final class Updater {
             throw URLError(.badServerResponse)
         }
         let assets = (json["assets"] as? [[String: Any]]) ?? []
-        func asset(_ suffix: String) -> URL? {
-            assets.first { ($0["name"] as? String)?.hasSuffix(suffix) == true }
-                .flatMap { $0["browser_download_url"] as? String }
-                .flatMap(URL.init(string:))
+        func asset(_ suffix: String) -> Asset? {
+            guard let a = assets.first(where: { ($0["name"] as? String)?.hasSuffix(suffix) == true }),
+                  let name = a["name"] as? String,
+                  let url = (a["browser_download_url"] as? String).flatMap(URL.init(string:)) else { return nil }
+            return Asset(name: name, downloadURL: url,
+                         apiURL: (a["url"] as? String).flatMap(URL.init(string:)),
+                         size: (a["size"] as? NSNumber)?.int64Value ?? 0)
         }
         let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
         return Release(version: version, tag: tag, notes: json["body"] as? String ?? "",
-                       pageURL: page, zipURL: asset(".zip"), shaURL: asset(".zip.sha256"))
+                       pageURL: page, zip: asset(".zip"), sha: asset(".zip.sha256"))
     }
 
     // MARK: Proposition
@@ -166,7 +187,7 @@ final class Updater {
     }
 
     private func install(_ release: Release) async {
-        guard let zipURL = release.zipURL else { return }
+        guard release.zip != nil else { return }
         if DownloadManager.shared.pendingCount > 0 {
             info(tr("Téléchargements en cours", "Downloads in progress"),
                  tr("Termine ou annule les téléchargements avant d'installer la mise à jour.",
@@ -181,22 +202,38 @@ final class Updater {
             let work = try fm.url(for: .itemReplacementDirectory, in: .userDomainMask,
                                   appropriateFor: appURL, create: true)
 
-            let (tmpZip, response) = try await URLSession.shared.download(from: zipURL)
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+            guard let zipAsset = release.zip else { return }
             let zip = work.appending(path: "update.zip")
-            try fm.moveItem(at: tmpZip, to: zip)
 
-            // Vérification SHA-256 (fichier .sha256 publié avec la release).
-            if let shaURL = release.shaURL {
-                let (shaData, _) = try await URLSession.shared.data(from: shaURL)
-                let expected = String(decoding: shaData, as: UTF8.self)
-                    .split(whereSeparator: { $0 == " " || $0 == "\n" }).first.map(String.init)?.lowercased() ?? ""
-                let actual = SHA256.hash(data: try Data(contentsOf: zip)).map { String(format: "%02x", $0) }.joined()
-                guard !expected.isEmpty, expected == actual else {
-                    throw UpdateError.message(tr("L'empreinte SHA-256 du téléchargement ne correspond pas.",
-                                                 "The download's SHA-256 checksum does not match."))
+            // Empreinte attendue (fichier .sha256 publié avec la release).
+            var expected: String?
+            if let shaAsset = release.sha {
+                let shaFile = try await fetch(shaAsset)
+                let text = (try? String(contentsOf: shaFile, encoding: .utf8)) ?? ""
+                let first = text.split(whereSeparator: { $0 == " " || $0 == "\n" || $0 == "\t" }).first.map(String.init)?.lowercased() ?? ""
+                guard first.count == 64, first.allSatisfy(\.isHexDigit) else {
+                    throw UpdateError.message(tr("Le fichier d'empreinte reçu est illisible.", "The checksum file received is unreadable.")
+                                              + "\n" + Self.preview(of: shaFile))
                 }
+                expected = first
             }
+
+            // Téléchargement + contrôles ; un second essai par l'API GitHub si le premier ne colle pas.
+            var lastProblem = ""
+            var verified = false
+            for attempt in 0..<2 {
+                let tmp = try await fetch(zipAsset, preferAPI: attempt == 1)
+                try? fm.removeItem(at: zip)
+                try fm.moveItem(at: tmp, to: zip)
+
+                if let problem = Self.problem(with: zip, expectedSize: zipAsset.size, expectedSHA: expected) {
+                    lastProblem = problem
+                    continue
+                }
+                verified = true
+                break
+            }
+            guard verified else { throw UpdateError.message(lastProblem) }
 
             status = .installing
             let extractDir = work.appending(path: "extracted", directoryHint: .isDirectory)
@@ -217,10 +254,76 @@ final class Updater {
             alert.alertStyle = .warning
             alert.messageText = tr("La mise à jour a échoué", "The update failed")
             alert.informativeText = error.localizedDescription
-            alert.addButton(withTitle: tr("Voir sur GitHub", "View on GitHub"))
+            alert.addButton(withTitle: tr("Télécharger manuellement", "Download Manually"))
+            alert.addButton(withTitle: tr("Copier le détail", "Copy Details"))
             alert.addButton(withTitle: "OK")
-            if alert.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(release.pageURL) }
+            switch alert.runModal() {
+            case .alertFirstButtonReturn:
+                NSWorkspace.shared.open(release.pageURL)
+            case .alertSecondButtonReturn:
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString("SUS Fetcher \(currentVersion ?? "?") → \(release.version)\n"
+                                               + error.localizedDescription, forType: .string)
+            default:
+                break
+            }
         }
+    }
+
+    /// Télécharge un fichier de la release sans cache ; `preferAPI` passe par api.github.com.
+    private func fetch(_ asset: Asset, preferAPI: Bool = false) async throws -> URL {
+        let url = (preferAPI ? asset.apiURL : nil) ?? asset.downloadURL
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        request.setValue("SUSFetcher", forHTTPHeaderField: "User-Agent")
+        if url == asset.apiURL { request.setValue("application/octet-stream", forHTTPHeaderField: "Accept") }
+        let (tmp, response) = try await updateSession.download(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw UpdateError.message(tr("Le serveur a répondu HTTP \(code) pour \(asset.name).",
+                                         "The server responded with HTTP \(code) for \(asset.name)."))
+        }
+        return tmp
+    }
+
+    /// Décrit précisément ce qui ne va pas avec l'archive reçue (nil = tout est correct).
+    private static func problem(with file: URL, expectedSize: Int64, expectedSHA: String?) -> String? {
+        let size = ((try? FileManager.default.attributesOfItem(atPath: file.path))?[.size] as? NSNumber)?.int64Value ?? 0
+        let head = (try? FileHandle(forReadingFrom: file)).flatMap { h -> Data? in
+            defer { try? h.close() }
+            return try? h.read(upToCount: 4)
+        } ?? Data()
+
+        if head != Data([0x50, 0x4B, 0x03, 0x04]) {
+            return tr("Le fichier reçu n'est pas une archive zip (\(formatBytes(size))). Un proxy, un filtre web ou un antivirus a probablement remplacé le téléchargement.",
+                      "The file received is not a zip archive (\(formatBytes(size))). A proxy, web filter or antivirus probably replaced the download.")
+                + "\n" + preview(of: file)
+        }
+        if expectedSize > 0, size != expectedSize {
+            return tr("Taille reçue : \(formatBytes(size)) au lieu de \(formatBytes(expectedSize)) (téléchargement incomplet ou modifié).",
+                      "Received size: \(formatBytes(size)) instead of \(formatBytes(expectedSize)) (incomplete or altered download).")
+        }
+        if let expectedSHA {
+            guard let data = try? Data(contentsOf: file) else { return tr("Lecture de l'archive impossible.", "Could not read the archive.") }
+            let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            if actual != expectedSHA {
+                return tr("L'empreinte SHA-256 ne correspond pas.", "The SHA-256 checksum does not match.")
+                    + "\n" + tr("Attendue : ", "Expected: ") + String(expectedSHA.prefix(16)) + "…"
+                    + "\n" + tr("Reçue : ", "Received: ") + String(actual.prefix(16)) + "…"
+            }
+        }
+        return nil
+    }
+
+    /// Début du fichier en texte (utile quand un proxy renvoie une page HTML).
+    private static func preview(of file: URL) -> String {
+        guard let h = try? FileHandle(forReadingFrom: file) else { return "" }
+        defer { try? h.close() }
+        let data = (try? h.read(upToCount: 160)) ?? Data()
+        let text = String(decoding: data, as: UTF8.self)
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? "" : "« " + text + " »"
     }
 
     /// Script détaché : attend la fin de l'app, remplace le bundle, relance.
