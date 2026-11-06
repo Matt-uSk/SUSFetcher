@@ -4,7 +4,7 @@
 
 🇫🇷 [Version française](README.fr.md)
 
-Native macOS app (Swift/SwiftUI, Apple Silicon, macOS 14+, zero dependencies) that reads the Apple Software Update catalog and downloads `InstallAssistant.pkg` **in one click** — no more right-click → Packages → InstallAssistant.pkg.
+Native macOS app (Swift/SwiftUI, Universal — Apple Silicon & Intel, macOS 14+, zero dependencies) that reads the Apple Software Update catalog and downloads `InstallAssistant.pkg` **in one click** — no more right-click → Packages → InstallAssistant.pkg.
 
 ## Origin and credits
 
@@ -56,7 +56,7 @@ The app is ad-hoc signed (no Apple Developer ID), so macOS blocks it on first la
 xattr -dr com.apple.quarantine "/Applications/SUS Fetcher.app"
 ```
 
-Apple Silicon, macOS 14 or later.
+Universal app (Apple Silicon and Intel), macOS 14 or later.
 
 After that, SUS Fetcher **updates itself**: it checks GitHub Releases once a day (or *SUS Fetcher → Check for Updates…*) and can install the new version and relaunch in one click.
 
@@ -64,7 +64,8 @@ After that, SUS Fetcher **updates itself**: it checks GitHub Releases once a day
 
 ```bash
 chmod +x build-app.sh
-./build-app.sh 1.0.0      # → build/SUS Fetcher.app
+./build-app.sh 1.0.0      # → build/SUS Fetcher.app (Universal)
+ARCHS=arm64 ./build-app.sh 1.0.0   # Apple Silicon only, faster
 ```
 
 For a quick test: `swift run`. Or `open Package.swift` to work in Xcode.

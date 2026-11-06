@@ -1,6 +1,6 @@
 name: Release
 
-# Builds SUS Fetcher.app on an Apple Silicon Mac and attaches it to a GitHub Release.
+# Builds SUS Fetcher.app (Universal: arm64 + x86_64) and attaches it to a GitHub Release.
 # Release notes = the matching section of CHANGELOG.md + installation instructions.
 # Triggers:
 #  - push a vX.Y.Z tag
@@ -57,7 +57,7 @@ jobs:
             echo '   xattr -dr com.apple.quarantine "/Applications/SUS Fetcher.app"'
             echo '   ```'
             echo
-            echo 'Apple Silicon, macOS 14 or later. — 🇫🇷 [Instructions en français](https://github.com/Matt-uSk/SUSFetcher/blob/main/README.fr.md#installation)'
+            echo 'Universal app (Apple Silicon and Intel), macOS 14 or later. — 🇫🇷 [Instructions en français](https://github.com/Matt-uSk/SUSFetcher/blob/main/README.fr.md#installation)'
           } > notes.md
           cat notes.md
 

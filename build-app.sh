@@ -1,5 +1,6 @@
 #!/bin/bash
-# Construit "SUS Fetcher.app" (Apple Silicon) dans ./build
+# Construit "SUS Fetcher.app" Universal (Apple Silicon + Intel) dans ./build
+# Architectures modifiables : ARCHS="arm64" ./build-app.sh   (Apple Silicon seul, plus rapide)
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -8,13 +9,18 @@ VERSION="${1:-${VERSION:-1.0.0}}"
 VERSION="${VERSION#v}"
 BUILD_NUMBER="${BUILD_NUMBER:-1}"
 
-swift build -c release --arch arm64
-BIN="$(swift build -c release --arch arm64 --show-bin-path)/SUSFetcher"
+ARCHS="${ARCHS:-arm64 x86_64}"
+ARCH_FLAGS=()
+for a in $ARCHS; do ARCH_FLAGS+=(--arch "$a"); done
+
+swift build -c release "${ARCH_FLAGS[@]}"
+BIN="$(swift build -c release "${ARCH_FLAGS[@]}" --show-bin-path)/SUSFetcher"
 
 APP="build/SUS Fetcher.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/SUSFetcher"
+echo "Architectures : $(lipo -archs "$APP/Contents/MacOS/SUSFetcher")"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 cat > "$APP/Contents/Info.plist" <<PLIST

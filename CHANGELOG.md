@@ -2,6 +2,11 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.9.0] - 2026-11-06
+
+### Added
+- **Universal app**: runs natively on Apple Silicon **and Intel** Macs (macOS 14 or later), one download for everyone — the updater works on both.
+
 ## [1.8.1] - 2026-11-05
 
 ### Fixed
