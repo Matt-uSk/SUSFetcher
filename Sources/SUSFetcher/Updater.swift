@@ -147,8 +147,24 @@ final class Updater {
         alert.informativeText = tr("Version installée : \(current)", "Installed version: \(current)")
             + "\n\n" + Self.summary(of: release.notes)
         alert.icon = NSApp.applicationIconImage
-        let canInstall = release.zipURL != nil && installLocationIsWritable
-        if canInstall { alert.addButton(withTitle: tr("Installer et relancer", "Install and Relaunch")) }
+
+        let mode = release.zipURL == nil ? InstallMode.unavailable(tr("Aucune archive dans cette version.",
+                                                                     "No archive in this release.")) : installMode
+        let canInstall: Bool
+        switch mode {
+        case .direct:
+            canInstall = true
+            alert.addButton(withTitle: tr("Installer et relancer", "Install and Relaunch"))
+        case .administrator:
+            canInstall = true
+            alert.informativeText += "\n\n" + tr("SUS Fetcher n'a pas le droit de modifier « \(appURL.deletingLastPathComponent().path) » avec ce compte : un mot de passe administrateur sera demandé.",
+                                                  "SUS Fetcher can't modify “\(appURL.deletingLastPathComponent().path)” with this account: an administrator password will be requested.")
+            alert.addButton(withTitle: tr("Installer et relancer (mot de passe administrateur)",
+                                          "Install and Relaunch (administrator password)"))
+        case .unavailable(let reason):
+            canInstall = false
+            alert.informativeText += "\n\n" + tr("Installation automatique impossible : ", "Automatic install unavailable: ") + reason
+        }
         alert.addButton(withTitle: tr("Voir sur GitHub", "View on GitHub"))
         alert.addButton(withTitle: tr("Plus tard", "Later"))
         alert.addButton(withTitle: tr("Ignorer cette version", "Skip This Version"))
@@ -158,7 +174,10 @@ final class Updater {
         // Les indices des boutons dépendent de la présence de « Installer ».
         let index = response.rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
         var actions: [() -> Void] = []
-        if canInstall { actions.append { Task { await self.install(release) } } }
+        if canInstall {
+            let privileged = mode == .administrator
+            actions.append { Task { await self.install(release, privileged: privileged) } }
+        }
         actions.append { NSWorkspace.shared.open(release.pageURL) }
         actions.append {}
         actions.append { UserDefaults.standard.set(release.version, forKey: Updater.skippedKey) }
@@ -179,14 +198,29 @@ final class Updater {
 
     private var appURL: URL { Bundle.main.bundleURL }
 
-    private var installLocationIsWritable: Bool {
-        guard appURL.pathExtension == "app" else { return false }
-        let fm = FileManager.default
-        return fm.isWritableFile(atPath: appURL.deletingLastPathComponent().path)
-            && fm.isWritableFile(atPath: appURL.path)
+    enum InstallMode: Equatable {
+        case direct                    // l'utilisateur peut remplacer l'app lui-même
+        case administrator             // remplacement avec un mot de passe administrateur
+        case unavailable(String)       // impossible (raison affichée)
     }
 
-    private func install(_ release: Release) async {
+    private var installMode: InstallMode {
+        guard appURL.pathExtension == "app" else {
+            return .unavailable(tr("l'app ne tourne pas depuis un bundle .app.", "the app isn't running from an .app bundle."))
+        }
+        // App Translocation : macOS fait tourner l'app depuis un emplacement temporaire en lecture seule.
+        if appURL.path.contains("/AppTranslocation/") {
+            return .unavailable(tr("macOS exécute l'app depuis un emplacement temporaire. Déplace « SUS Fetcher » dans le dossier Applications, relance-la puis réessaie.",
+                                   "macOS is running the app from a temporary location. Move “SUS Fetcher” to the Applications folder, relaunch it and try again."))
+        }
+        let fm = FileManager.default
+        if fm.isWritableFile(atPath: appURL.deletingLastPathComponent().path), fm.isWritableFile(atPath: appURL.path) {
+            return .direct
+        }
+        return .administrator
+    }
+
+    private func install(_ release: Release, privileged: Bool = false) async {
         guard release.zip != nil else { return }
         if DownloadManager.shared.pendingCount > 0 {
             info(tr("Téléchargements en cours", "Downloads in progress"),
@@ -246,7 +280,7 @@ final class Updater {
                 throw UpdateError.message(tr("L'archive ne contient pas SUS Fetcher.", "The archive does not contain SUS Fetcher."))
             }
 
-            try launchReplacementScript(newApp: newApp, workDir: work)
+            try launchReplacementScript(newApp: newApp, workDir: work, privileged: privileged)
             NSApp.terminate(nil)
         } catch {
             status = .failed(error.localizedDescription)
@@ -327,10 +361,12 @@ final class Updater {
     }
 
     /// Script détaché : attend la fin de l'app, remplace le bundle, relance.
-    private func launchReplacementScript(newApp: URL, workDir: URL) throws {
+    /// `privileged` : lancé en root via une demande de mot de passe administrateur ; l'app est
+    /// ensuite relancée sous le compte de l'utilisateur (pas en root).
+    private func launchReplacementScript(newApp: URL, workDir: URL, privileged: Bool = false) throws {
         let script = """
         #!/bin/sh
-        PID="$1"; NEW="$2"; DEST="$3"; WORK="$4"
+        PID="$1"; NEW="$2"; DEST="$3"; WORK="$4"; USER_ID="$5"
         i=0
         while kill -0 "$PID" 2>/dev/null; do
           i=$((i+1)); [ "$i" -gt 600 ] && exit 1   # abandon après ~2 min (quitter annulé)
@@ -345,17 +381,43 @@ final class Updater {
         fi
         xattr -dr com.apple.quarantine "$DEST" 2>/dev/null
         rm -rf "$WORK"
-        open "$DEST"
+        if [ "$(id -u)" = "0" ] && [ -n "$USER_ID" ] && [ "$USER_ID" != "0" ]; then
+          launchctl asuser "$USER_ID" sudo -u "#$USER_ID" /usr/bin/open "$DEST"
+        else
+          /usr/bin/open "$DEST"
+        fi
         """
         let scriptURL = workDir.appending(path: "update.sh")
         try script.write(to: scriptURL, atomically: true, encoding: .utf8)
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = [scriptURL.path,
-                             String(ProcessInfo.processInfo.processIdentifier),
-                             newApp.path, appURL.path, workDir.path]
-        try process.run()
+        let args = [scriptURL.path, String(ProcessInfo.processInfo.processIdentifier),
+                    newApp.path, appURL.path, workDir.path, String(getuid())]
+
+        guard privileged else {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/sh")
+            process.arguments = args
+            try process.run()
+            return
+        }
+
+        // Demande d'autorisation macOS standard, script lancé en arrière-plan en root.
+        func shellQuote(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
+        let command = "/bin/sh " + args.map(shellQuote).joined(separator: " ") + " >/dev/null 2>&1 &"
+        let appleScriptCommand = command
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        let source = "do shell script \"\(appleScriptCommand)\" with administrator privileges"
+        var errorInfo: NSDictionary?
+        _ = NSAppleScript(source: source)?.executeAndReturnError(&errorInfo)
+        if let errorInfo {
+            // -128 : l'utilisateur a annulé la demande de mot de passe.
+            if (errorInfo[NSAppleScript.errorNumber] as? Int) == -128 {
+                throw UpdateError.message(tr("Installation annulée.", "Installation cancelled."))
+            }
+            throw UpdateError.message((errorInfo[NSAppleScript.errorMessage] as? String)
+                                      ?? tr("Autorisation administrateur refusée.", "Administrator authorization denied."))
+        }
     }
 
     private func run(_ tool: String, _ args: [String]) throws {

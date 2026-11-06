@@ -2,6 +2,12 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.9.2] - 2026-11-06
+
+### Fixed
+- Updater: on Macs where the account can't modify the app's folder (standard / non-admin account, app installed by an administrator), *Install and Relaunch* was silently missing. It now offers **Install and Relaunch (administrator password)**: macOS asks for an admin password, the app is replaced and relaunched under the user's account.
+- Updater: when automatic install isn't possible, the window now says why (e.g. app running from a temporary *App Translocation* location — move it to Applications).
+
 ## [1.9.1] - 2026-11-06
 
 ### Fixed
