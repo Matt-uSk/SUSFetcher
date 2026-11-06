@@ -20,3 +20,5 @@ jobs:
             grep -E "error:" build.log | sed -E 's/^(.*)$/::error::\1/' | head -40
             exit 1
           fi
+      - name: Architectures
+        run: echo "::notice title=Architectures::$(lipo -archs 'build/SUS Fetcher.app/Contents/MacOS/SUSFetcher')"
