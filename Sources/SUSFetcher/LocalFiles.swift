@@ -17,6 +17,23 @@ final class LocalFiles {
         let url: URL
         let size: Int64
         let modified: Double
+        /// SHA-1 de la TOC xar (paquets) : identifie le paquet, lu pendant le scan (quelques Ko).
+        var xarTOC: String? = nil
+    }
+
+    /// Tous les fichiers trouvés, du plus récent au plus ancien (page « Sur ce Mac »).
+    var allFiles: [ScannedFile] {
+        filesBySize.values.flatMap { $0 }.sorted { $0.modified > $1.modified }
+    }
+
+    /// Met des fichiers à la Corbeille puis relit le dossier.
+    func trash(_ urls: [URL]) -> Int {
+        var count = 0
+        for url in urls where (try? FileManager.default.trashItem(at: url, resultingItemURL: nil)) != nil {
+            count += 1
+        }
+        rescan()
+        return count
     }
 
     struct Fingerprint: Codable, Sendable {
@@ -75,8 +92,10 @@ final class LocalFiles {
                   let values = try? url.resourceValues(forKeys: Set(keys)),
                   values.isRegularFile == true,
                   let size = values.fileSize, size > 0 else { continue }
+            let isPackage = url.pathExtension.lowercased() == "pkg"
             result.append(ScannedFile(url: url, size: Int64(size),
-                                      modified: values.contentModificationDate?.timeIntervalSince1970 ?? 0))
+                                      modified: values.contentModificationDate?.timeIntervalSince1970 ?? 0,
+                                      xarTOC: isPackage ? PackageIntegrity.xarTOCDigest(of: url) : nil))
         }
         return result
     }
@@ -92,6 +111,10 @@ final class LocalFiles {
         for file in candidates {
             // Paquet : la TOC xar suffit (lecture de quelques Ko). IPSW : empreinte du fichier entier.
             let wantsTOC = xarTOC != nil
+            if wantsTOC, let toc = file.xarTOC {      // déjà lue pendant le scan
+                if toc == xarTOC { return file.url }
+                continue
+            }
             guard let fp = fingerprints[file.url.path], fp.size == file.size, fp.modified == file.modified,
                   wantsTOC ? fp.xarTOC != nil : (fp.sha1 != nil || fp.sha256 != nil) else {
                 schedule(file)

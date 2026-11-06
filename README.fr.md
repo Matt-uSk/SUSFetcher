@@ -18,6 +18,7 @@ App macOS native (Swift/SwiftUI, Universal — Apple Silicon et Intel, macOS 14+
 - Page Téléchargements + mini-moniteur en bas de la sidebar : progression, vitesse, temps restant, **pause / reprise**, annulation, réessai
 - Confirmation avant de quitter si des téléchargements sont en cours
 - File d'attente avec un nombre de téléchargements simultanés configurable
+- **Sur ce Mac** : les fichiers déjà téléchargés, identifiés (même renommés), avec un badge « version plus récente disponible »
 - Détection des fichiers déjà présents dans le dossier de destination (**✓ Présent**), même renommés (taille + empreinte), pour éviter de les retélécharger
 - Produits « Autres » : menu des paquets, rangés dans `<Titre> <version> [<Product ID>]/`
 - Canaux : Public, Bêta publique, Bêta développeur, AppleSeed — produits bêta marqués BÊTA, filtre « Bêtas uniquement »

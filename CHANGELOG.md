@@ -2,6 +2,11 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.10.0] - 2026-11-06
+
+### Added
+- **On This Mac** (sidebar › Activity, ⌘7): every `.pkg` / `.ipsw` already in the destination folder (subfolders included) with type, version, size, date and folder, plus the total size. Packages are **identified** from the catalog by their xar TOC digest, even renamed, and flagged when a **newer version is available**. Right-click: Show in Finder, Copy Path, Move to Trash (with confirmation).
+
 ## [1.9.2] - 2026-11-06
 
 ### Fixed

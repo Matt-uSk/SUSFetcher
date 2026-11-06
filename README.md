@@ -18,6 +18,7 @@ Native macOS app (Swift/SwiftUI, Universal — Apple Silicon & Intel, macOS 14+,
 - Downloads page + mini monitor at the bottom of the sidebar: progress, speed, time remaining, **pause / resume**, cancel, retry
 - Confirmation before quitting while downloads are in progress
 - Download queue with a configurable number of simultaneous downloads
+- **On This Mac**: files already downloaded, identified (even renamed), with “newer version available” badges
 - Files already in the destination folder are detected (**✓ Downloaded**), even renamed (size + checksum), instead of being downloaded again
 - “Other” products: package menu, saved into `<Title> <version> [<Product ID>]/`
 - Channels: Public, Public beta, Developer beta, AppleSeed — beta-only products get a BETA badge, “Betas only” filter

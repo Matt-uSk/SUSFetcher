@@ -36,6 +36,8 @@ struct SUSFetcherApp: App {
                     .keyboardShortcut("5")
                 Button(tr("Téléchargements", "Downloads")) { viewState.showDownloads() }
                     .keyboardShortcut("6")
+                Button(tr("Sur ce Mac", "On This Mac")) { viewState.sidebar = .localFiles }
+                    .keyboardShortcut("7")
                 Divider()
             }
             CommandGroup(after: .newItem) {

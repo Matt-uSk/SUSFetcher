@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 enum SidebarItem: Identifiable, Hashable {
-    case installers, others, iphone, ipad, mac, downloads
+    case installers, others, iphone, ipad, mac, downloads, localFiles
     case collectionItem(UUID, String)   // (collection, Favorite.id)
 
     var id: String {
@@ -13,6 +13,7 @@ enum SidebarItem: Identifiable, Hashable {
         case .ipad: "ipad"
         case .mac: "mac"
         case .downloads: "downloads"
+        case .localFiles: "localFiles"
         case .collectionItem(let c, let f): "collection:\(c.uuidString):\(f)"
         }
     }
@@ -44,6 +45,7 @@ enum SidebarItem: Identifiable, Hashable {
         case .installers: tr("Installers macOS", "macOS Installers")
         case .others: tr("Autres", "Other")
         case .downloads: tr("Téléchargements", "Downloads")
+        case .localFiles: tr("Sur ce Mac", "On This Mac")
         case .iphone: "iPhone"
         case .ipad: "iPad"
         case .mac: tr("Mac (Apple Silicon)", "Mac (Apple Silicon)")
@@ -57,6 +59,7 @@ enum SidebarItem: Identifiable, Hashable {
         case .installers: "laptopcomputer.and.arrow.down"
         case .others: "shippingbox"
         case .downloads: "arrow.down.circle"
+        case .localFiles: "internaldrive"
         case .iphone: "iphone"
         case .ipad: "ipad"
         case .mac: "laptopcomputer"
@@ -74,6 +77,8 @@ final class ViewState {
     var search = ""
     var selection = Set<SUProduct.ID>()
     var sortOrder = [KeyPathComparator(\SUProduct.postDate, order: .reverse)]
+    var localSortOrder = [KeyPathComparator(\LocalFileRow.date, order: .reverse)]
+    var localSelection = Set<URL>()
     var betaOnly = true
 
     func showDownloads() {
@@ -141,6 +146,8 @@ struct ContentView: View {
             Section(tr("Activité", "Activity")) {
                 SidebarRow(item: .downloads, count: downloads.pendingCount)
                     .tag(SidebarItem.downloads)
+                SidebarRow(item: .localFiles, count: LocalFiles.shared.allFiles.count)
+                    .tag(SidebarItem.localFiles)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -165,6 +172,8 @@ struct ContentView: View {
     private var detail: some View {
         if sidebar == .downloads {
             DownloadsPane(downloads: downloads, search: search)
+        } else if sidebar == .localFiles {
+            LocalFilesPane(files: LocalFiles.shared, downloads: downloads, state: state, search: search)
         } else if let family = sidebar?.ipswFamily {
             IPSWPane(family: family, model: IPSWModel.shared, downloads: downloads, search: search)
                 .id(family)
@@ -251,7 +260,7 @@ struct ContentView: View {
 
     private var searchPrompt: String {
         switch sidebar {
-        case .downloads?: tr("Nom du fichier, produit…", "File name, product…")
+        case .downloads?, .localFiles?: tr("Nom du fichier, produit…", "File name, product…")
         case .iphone?, .ipad?, .mac?: tr("Modèle ou identifiant…", "Model or identifier…")
         default: tr("Titre, version, build, ID…", "Title, version, build, ID…")
         }
@@ -284,6 +293,7 @@ struct ContentView: View {
         case .installers: visible(catalog.installers).count
         case .others: visible(catalog.others).count
         case .downloads: downloads.pendingCount
+        case .localFiles: LocalFiles.shared.allFiles.count
         case .collectionItem: 0
         case .iphone, .ipad, .mac:
             item.ipswFamily.map { IPSWModel.shared.count($0) } ?? 0
