@@ -238,6 +238,9 @@ struct DownloadRow: View {
             if case .finished(let url) = item.state {
                 Button(tr("Afficher dans le Finder", "Show in Finder")) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
             }
+            if case .finished = item.state, item.checksum != nil {
+                Button(tr("Revérifier l'intégrité", "Verify Again")) { downloads.reverify(item.source) }
+            }
         }
     }
 

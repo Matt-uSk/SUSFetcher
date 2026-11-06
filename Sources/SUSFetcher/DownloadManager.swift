@@ -63,7 +63,12 @@ struct DownloadItem: Identifiable, Equatable {
     var verification: Verification? = nil
 
     struct Checksum: Equatable, Sendable {
-        enum Algorithm: String, Sendable { case sha256 = "SHA-256", sha1 = "SHA-1" }
+        enum Algorithm: String, Sendable {
+            case sha256 = "SHA-256"
+            case sha1 = "SHA-1"
+            case xarTOC = "TOC xar"            // « Digest » du catalogue Apple
+            case chunklist = "chunklist Apple" // value = URL de la chunklist
+        }
         let algorithm: Algorithm
         let value: String
     }
@@ -158,13 +163,13 @@ final class DownloadManager {
         guard let pkg = product.installAssistant else { return }
         start(pkg, to: installerDestination(product),
               title: "\(product.displayTitle) \(product.versionString)".trimmingCharacters(in: .whitespaces),
-              checksum: pkg.sha1.map { .init(algorithm: .sha1, value: $0) })
+              checksum: pkg.checksum)
     }
 
     /// N'importe quel paquet d'un produit, rangé dans un sous-dossier par produit.
     func download(_ pkg: SUPackage, of product: SUProduct) {
         start(pkg, to: packageDestination(pkg, of: product), title: product.displayTitle,
-              checksum: pkg.sha1.map { .init(algorithm: .sha1, value: $0) })
+              checksum: pkg.checksum)
     }
 
     /// IPSW, enregistré dans <dossier>/IPSW/<nom d'origine Apple>, avec vérification d'empreinte.
@@ -209,12 +214,12 @@ final class DownloadManager {
     func existingInstaller(_ product: SUProduct) -> URL? {
         guard let pkg = product.installAssistant else { return nil }
         return Self.existingFile(at: installerDestination(product), expectedSize: pkg.size)
-            ?? LocalFiles.shared.match(size: pkg.size, sha1: pkg.sha1, sha256: nil)
+            ?? LocalFiles.shared.match(size: pkg.size, xarTOC: pkg.tocDigest)
     }
 
     func existingPackage(_ pkg: SUPackage, of product: SUProduct) -> URL? {
         Self.existingFile(at: packageDestination(pkg, of: product), expectedSize: pkg.size)
-            ?? LocalFiles.shared.match(size: pkg.size, sha1: pkg.sha1, sha256: nil)
+            ?? LocalFiles.shared.match(size: pkg.size, xarTOC: pkg.tocDigest)
     }
 
     func existingIPSW(_ firmware: IPSWFirmware, device: IPSWDevice) -> URL? {
@@ -305,7 +310,10 @@ final class DownloadManager {
             source: pkg.url, destination: destination, title: title,
             expectedSize: pkg.size, createdAt: .now,
             state: .queued(nil),
-            checksum: checksum.map { .init(algorithm: $0.algorithm, value: $0.value.lowercased()) }
+            checksum: checksum.map { c in
+                // Les URL (chunklist) gardent leur casse ; les empreintes hexadécimales sont normalisées.
+                .init(algorithm: c.algorithm, value: c.algorithm == .chunklist ? c.value : c.value.lowercased())
+            }
         ))
         pump()
     }
@@ -347,24 +355,20 @@ final class DownloadManager {
         Task.detached(priority: .utility) {
             let result: DownloadItem.Verification
             do {
-                let handle = try FileHandle(forReadingFrom: file)
-                defer { try? handle.close() }
-                let digest: String
                 switch expected.algorithm {
-                case .sha256:
-                    var hasher = SHA256()
-                    while let chunk = try handle.read(upToCount: 8 * 1024 * 1024), !chunk.isEmpty {
-                        hasher.update(data: chunk)
+                case .chunklist:
+                    guard let url = URL(string: expected.value) else { throw URLError(.badURL) }
+                    let (data, response) = try await URLSession.shared.data(from: url)
+                    guard (response as? HTTPURLResponse)?.statusCode == 200,
+                          let chunks = PackageIntegrity.parseChunklist(data) else {
+                        throw URLError(.cannotParseResponse)
                     }
-                    digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
-                case .sha1:
-                    var hasher = Insecure.SHA1()
-                    while let chunk = try handle.read(upToCount: 8 * 1024 * 1024), !chunk.isEmpty {
-                        hasher.update(data: chunk)
-                    }
-                    digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+                    result = try PackageIntegrity.verify(file: file, against: chunks) ? .ok : .mismatch
+                case .xarTOC:
+                    result = PackageIntegrity.xarTOCDigest(of: file) == expected.value ? .ok : .mismatch
+                case .sha256, .sha1:
+                    result = try Self.fullDigest(of: file, algorithm: expected.algorithm) == expected.value ? .ok : .mismatch
                 }
-                result = digest == expected.value ? .ok : .mismatch
             } catch {
                 result = .error(error.localizedDescription)
             }
@@ -373,6 +377,29 @@ final class DownloadManager {
                 AutoSync.shared.downloadFinished(source: source, file: file, ok: result == .ok)
             }
         }
+    }
+
+    /// Re-vérifie un téléchargement terminé (ex. après une vérification erronée).
+    func reverify(_ url: URL) {
+        guard let item = item(url), case .finished(let file) = item.state, let checksum = item.checksum else { return }
+        verify(url, file: file, expected: checksum)
+    }
+
+    nonisolated private static func fullDigest(of file: URL, algorithm: DownloadItem.Checksum.Algorithm) throws -> String {
+        let handle = try FileHandle(forReadingFrom: file)
+        defer { try? handle.close() }
+        let digest: String
+        switch algorithm {
+        case .sha256:
+            var hasher = SHA256()
+            while let chunk = try handle.read(upToCount: 8 * 1024 * 1024), !chunk.isEmpty { hasher.update(data: chunk) }
+            digest = hasher.finalize().hexString
+        default:
+            var hasher = Insecure.SHA1()
+            while let chunk = try handle.read(upToCount: 8 * 1024 * 1024), !chunk.isEmpty { hasher.update(data: chunk) }
+            digest = hasher.finalize().hexString
+        }
+        return digest
     }
 
     private func updateProgress(_ source: URL, _ taskID: Int, _ received: Int64, _ total: Int64) {

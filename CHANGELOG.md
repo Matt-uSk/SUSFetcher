@@ -2,6 +2,16 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.9.1] - 2026-11-06
+
+### Fixed
+- **False “SHA-1 mismatch — corrupted file”** on InstallAssistant and catalog packages. The catalog's `Digest` turned out to be the SHA-1 of the package's **xar table of contents**, not of the whole file (checked against real Apple packages). Downloads were fine; the check was wrong.
+- InstallAssistant (and every package that provides it) is now verified with Apple's **chunklist** — the SHA-256 of each 10 MB chunk, the same integrity data macOS uses — so the **whole file** is checked. Other packages are checked against their xar TOC digest.
+- Renamed-file detection for `.pkg` now reads only the xar TOC (a few KB) instead of hashing the whole file: instant.
+
+### Added
+- Right-click a finished download → **Verify Again**.
+
 ## [1.9.0] - 2026-11-06
 
 ### Added

@@ -33,7 +33,17 @@ enum CatalogChannel: String, CaseIterable, Identifiable, Sendable {
 struct SUPackage: Identifiable, Hashable, Sendable {
     let url: URL
     let size: Int64
-    var sha1: String? = nil      // « Digest » du catalogue Apple
+    /// « Digest » du catalogue : SHA-1 de la TOC xar (identifie le paquet, pas tout son contenu).
+    var tocDigest: String? = nil
+    /// « IntegrityDataURL » : chunklist (SHA-256 par morceau de 10 Mo) pour vérifier le fichier entier.
+    var integrityURL: URL? = nil
+
+    /// Contrôle à faire après téléchargement : chunklist si disponible, sinon TOC xar.
+    var checksum: DownloadItem.Checksum? {
+        if let integrityURL { return .init(algorithm: .chunklist, value: integrityURL.absoluteString) }
+        if let tocDigest { return .init(algorithm: .xarTOC, value: tocDigest) }
+        return nil
+    }
     var id: URL { url }
     var fileName: String { url.lastPathComponent }
 }
