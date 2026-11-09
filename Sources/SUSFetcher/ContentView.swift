@@ -128,6 +128,7 @@ struct ContentView: View {
             IPSWModel.shared.loadDevicesIfNeeded()
             LocalFiles.shared.rescan()
             ConnectedDevices.shared.start()
+            DFUTool.shared.refreshInstallState()
         }
         .onChange(of: catalog.channel) { catalog.reload() }
         .onChange(of: state.sidebar) { state.selection.removeAll() }

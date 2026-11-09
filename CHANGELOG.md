@@ -2,6 +2,14 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.1.0-beta.1] - 2026-11-09
+
+Pre-release for testing — published on the beta channel only.
+
+### Added
+- **DFU without the administrator password**: DFU Mode page › *Enable* (admin password one last time) installs the DFU tool in a protected system folder (`/Library/PrivilegedHelperTools`, owned by root) with a sudo rule limited to its two commands (DFU and restart). Commands then run without the password prompt.
+- **Touch ID**: in that mode each DFU / restart is confirmed with Touch ID (or the login password on Macs without it) — can be turned off. *Disable* removes the tool and the rule; the app offers to update the installed tool when a new version ships a different one.
+
 ## [2.0.0] - 2026-11-09
 
 ### Added
