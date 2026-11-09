@@ -2,8 +2,9 @@ import AppKit
 import SwiftUI
 
 enum SidebarItem: Identifiable, Hashable {
-    case installers, others, iphone, ipad, mac, downloads, localFiles
+    case installers, others, iphone, ipad, mac, downloads, localFiles, dfu
     case collectionItem(UUID, String)   // (collection, Favorite.id)
+    case device(String)                 // appareil branché (ConnectedDevice.id)
 
     var id: String {
         switch self {
@@ -14,7 +15,9 @@ enum SidebarItem: Identifiable, Hashable {
         case .mac: "mac"
         case .downloads: "downloads"
         case .localFiles: "localFiles"
+        case .dfu: "dfu"
         case .collectionItem(let c, let f): "collection:\(c.uuidString):\(f)"
+        case .device(let id): "device:\(id)"
         }
     }
 
@@ -46,6 +49,10 @@ enum SidebarItem: Identifiable, Hashable {
         case .others: tr("Autres", "Other")
         case .downloads: tr("Téléchargements", "Downloads")
         case .localFiles: tr("Sur ce Mac", "On This Mac")
+        case .dfu: tr("Mode DFU", "DFU Mode")
+        case .device(let id):
+            ConnectedDevices.shared.device(id).map { ConnectedDevices.shared.displayName(of: $0) }
+                ?? tr("Appareil déconnecté", "Device disconnected")
         case .iphone: "iPhone"
         case .ipad: "iPad"
         case .mac: tr("Mac (Apple Silicon)", "Mac (Apple Silicon)")
@@ -60,6 +67,8 @@ enum SidebarItem: Identifiable, Hashable {
         case .others: "shippingbox"
         case .downloads: "arrow.down.circle"
         case .localFiles: "internaldrive"
+        case .dfu: "bolt.horizontal.circle"
+        case .device(let id): ConnectedDevices.shared.device(id).map { ConnectedDevices.shared.icon(of: $0) } ?? "cable.connector"
         case .iphone: "iphone"
         case .ipad: "ipad"
         case .mac: "laptopcomputer"
@@ -118,6 +127,7 @@ struct ContentView: View {
             if catalog.products.isEmpty { catalog.reload() }
             IPSWModel.shared.loadDevicesIfNeeded()
             LocalFiles.shared.rescan()
+            ConnectedDevices.shared.start()
         }
         .onChange(of: catalog.channel) { catalog.reload() }
         .onChange(of: state.sidebar) { state.selection.removeAll() }
@@ -149,6 +159,21 @@ struct ContentView: View {
                 SidebarRow(item: .localFiles, count: LocalFiles.shared.allFiles.count)
                     .tag(SidebarItem.localFiles)
             }
+            Section(tr("Appareils connectés", "Connected Devices")) {
+                let connected = ConnectedDevices.shared
+                ForEach(connected.devices) { d in
+                    ConnectedDeviceRow(device: d, devices: connected)
+                        .tag(SidebarItem.device(d.id))
+                }
+                if connected.devices.isEmpty {
+                    Label(tr("Aucun appareil branché", "No device connected"), systemImage: "cable.connector")
+                        .foregroundStyle(.tertiary)
+                        .help(tr("Branchez un iPhone, un iPad, ou un appareil en DFU / Recovery.",
+                                 "Connect an iPhone, an iPad, or a device in DFU / Recovery."))
+                }
+                SidebarRow(item: .dfu, count: 0)
+                    .tag(SidebarItem.dfu)
+            }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
@@ -172,6 +197,11 @@ struct ContentView: View {
     private var detail: some View {
         if sidebar == .downloads {
             DownloadsPane(downloads: downloads, search: search)
+        } else if sidebar == .dfu {
+            DFUPane(devices: ConnectedDevices.shared, tool: DFUTool.shared, state: state)
+        } else if case .device(let id)? = sidebar {
+            DevicePane(deviceID: id, devices: ConnectedDevices.shared, model: IPSWModel.shared,
+                       downloads: downloads, state: state)
         } else if sidebar == .localFiles {
             LocalFilesPane(files: LocalFiles.shared, downloads: downloads, state: state, search: search)
         } else if let family = sidebar?.ipswFamily {
@@ -294,7 +324,7 @@ struct ContentView: View {
         case .others: visible(catalog.others).count
         case .downloads: downloads.pendingCount
         case .localFiles: LocalFiles.shared.allFiles.count
-        case .collectionItem: 0
+        case .collectionItem, .dfu, .device: 0
         case .iphone, .ipad, .mac:
             item.ipswFamily.map { IPSWModel.shared.count($0) } ?? 0
         }

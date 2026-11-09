@@ -10,6 +10,7 @@ App macOS native (Swift/SwiftUI, Universal — Apple Silicon et Intel, macOS 14+
 
 - **Inspiré de [SUS Inspector](https://github.com/hjuutilainen/sus-inspector)** de Hannes Juutilainen. Le concept (parcourir le catalogue Apple Software Update et en extraire les paquets) vient de là. SUS Inspector reposant sur Python 2 / PyObjC, SUS Fetcher en est une réécriture complète et moderne, centrée sur le téléchargement des installers macOS. Aucun code de SUS Inspector n'a été repris.
 - **La majorité du code a été écrite par [Claude](https://claude.ai) (Anthropic)**.
+- Le passage en DFU des Mac Apple Silicon utilise **[macvdmtool](https://github.com/AsahiLinux/macvdmtool)** des contributeurs Asahi Linux (Apache 2.0, voir `ThirdParty/macvdmtool`).
 
 ## Fonctions
 
@@ -18,6 +19,8 @@ App macOS native (Swift/SwiftUI, Universal — Apple Silicon et Intel, macOS 14+
 - Page Téléchargements + mini-moniteur en bas de la sidebar : progression, vitesse, temps restant, **pause / reprise**, annulation, réessai
 - Confirmation avant de quitter si des téléchargements sont en cours
 - File d'attente avec un nombre de téléchargements simultanés configurable
+- **Appareils connectés** *(bêta 2.0)* : iPhone, iPad et tout appareil Apple en DFU / Recovery (Mac Apple Silicon compris) apparaissent en bas de la barre latérale, identifiés automatiquement, avec leurs firmwares et un statut « à jour / mise à jour disponible »
+- **Mode DFU** *(bêta 2.0)* : passer en DFU (ou redémarrer) un Mac Apple Silicon relié à ce Mac en un clic, sans combinaison de touches ; guides pas à pas pour iPhone / iPad
 - **Sur ce Mac** : les fichiers déjà téléchargés, identifiés (même renommés), avec un badge « version plus récente disponible »
 - Détection des fichiers déjà présents dans le dossier de destination (**✓ Présent**), même renommés (taille + empreinte), pour éviter de les retélécharger
 - Produits « Autres » : menu des paquets, rangés dans `<Titre> <version> [<Product ID>]/`
@@ -83,5 +86,5 @@ Voir [CHANGELOG.md](CHANGELOG.md) (en anglais).
 
 ## Licence
 
-[MIT](LICENSE) — fais-en ce que tu veux.
+[MIT](LICENSE) — fais-en ce que tu veux. L'outil `macvdmtool` embarqué est sous Apache 2.0 (`ThirdParty/macvdmtool`).
 

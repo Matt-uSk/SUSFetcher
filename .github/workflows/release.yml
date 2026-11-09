@@ -5,6 +5,7 @@ name: Release
 # Triggers:
 #  - push a vX.Y.Z tag
 #  - Actions > Release > "Run workflow", entering the version (creates the tag and the Release)
+#    A version with a suffix (v2.0.0-beta.1) is published as a pre-release: run it from the beta branch.
 #    Tick "notes only" to just refresh the release notes from CHANGELOG.md (no rebuild).
 on:
   push:
@@ -93,7 +94,10 @@ jobs:
           elif [ "$NOTES_ONLY" = "true" ]; then
             echo "::error::Release $TAG does not exist (notes only)"; exit 1
           else
-            gh release create "$TAG" "$ZIP" "$ZIP.sha256" \
+            # vX.Y.Z-beta.N → pre-release (not "Latest": stable users never see it)
+            PRE=()
+            case "$TAG" in *-*) PRE=(--prerelease --latest=false) ;; esac
+            gh release create "$TAG" "$ZIP" "$ZIP.sha256" "${PRE[@]}" \
               --target "$GITHUB_SHA" \
               --title "SUS Fetcher ${TAG}" \
               --notes-file notes.md

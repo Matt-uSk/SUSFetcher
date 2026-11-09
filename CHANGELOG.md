@@ -2,6 +2,16 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.0.0-beta.1] - 2026-11-09
+
+Pre-release for testing — published on the beta channel only.
+
+### Added
+- **Connected Devices** (bottom of the sidebar): iPhone and iPad plugged in over USB appear with their name, model and iOS version (read from the device, no pairing needed). Devices in **DFU or Recovery** — Apple Silicon Macs included — are detected too and identified from their chip (CPID/BDID).
+- Clicking a device opens its page: model, identifier, UDID / ECID (click to copy), **up to date / update available** status (or the latest signed version to restore with), and its firmwares ready to download.
+- **DFU Mode** page: **put an Apple Silicon Mac connected to this Mac into DFU** in one click, or restart it to leave DFU (bundled [macvdmtool](https://github.com/AsahiLinux/macvdmtool), Apache 2.0; requires an Apple Silicon Mac, both Macs connected through their DFU ports, and an administrator password). Step-by-step button guides for iPhone / iPad (no software DFU exists for those) and for a Mac without a second Mac.
+- Updater: **update channel** setting (Stable / Beta). Beta builds follow the Beta channel by default; version comparison now understands pre-releases (2.0.0 > 2.0.0-beta.2 > 2.0.0-beta.1).
+
 ## [1.10.0] - 2026-11-06
 
 ### Added

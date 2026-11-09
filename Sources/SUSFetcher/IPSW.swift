@@ -22,7 +22,15 @@ enum IPSWFamily: String, CaseIterable, Identifiable, Sendable {
 struct IPSWDevice: Identifiable, Hashable, Codable, Sendable {
     let name: String
     let identifier: String
+    /// Cartes mères connues (ipsw.me) : CPID/BDID servent à reconnaître un appareil en DFU / Recovery.
+    var boards: [Board]? = nil
     var id: String { identifier }
+
+    struct Board: Hashable, Codable, Sendable {
+        let boardconfig: String?
+        let cpid: Int?
+        let bdid: Int?
+    }
 
     /// (génération, variante) tirées de l'identifiant : iPhone18,3 → (18, 3). Sert au tri « plus récent d'abord ».
     var generation: (Int, Int) {
@@ -361,6 +369,13 @@ final class IPSWModel {
 
     func count(_ family: IPSWFamily) -> Int { devices.filter { family.matches($0.identifier) }.count }
 
+    func device(_ identifier: String) -> IPSWDevice? { devices.first { $0.identifier == identifier } }
+
+    /// Appareil correspondant à une puce (CPID) et une carte (BDID), lus en mode DFU / Recovery.
+    func device(cpid: Int, bdid: Int) -> IPSWDevice? {
+        devices.first { $0.boards?.contains { $0.cpid == cpid && $0.bdid == bdid } == true }
+    }
+
     func loadDevicesIfNeeded() {
         guard devices.isEmpty, !isLoadingDevices else { return }
         reloadDevices(force: false)
@@ -371,7 +386,11 @@ final class IPSWModel {
         devicesError = nil
         Task {
             do {
-                let result = try await service.devices(forceRefresh: force)
+                var result = try await service.devices(forceRefresh: force)
+                // Cache d'une version précédente (sans CPID/BDID) : on le renouvelle une fois.
+                if !force, result.source == .ipswme, !result.devices.contains(where: { $0.boards != nil }) {
+                    result = (try? await service.devices(forceRefresh: true)) ?? result
+                }
                 devices = result.devices
                 devicesSource = result.source
             } catch {

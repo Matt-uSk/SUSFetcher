@@ -19,6 +19,25 @@ final class Updater {
     private static let autoKey = "updatesAutoCheck"
     private static let lastCheckKey = "updatesLastCheck"
     private static let skippedKey = "updatesSkippedVersion"
+    private static let channelKey = "updatesChannel"
+
+    /// Stable : releases publiques uniquement. Bêta : inclut les préversions (v2.0.0-beta.1…).
+    enum Channel: String, CaseIterable, Identifiable {
+        case stable, beta
+        var id: String { rawValue }
+        @MainActor var label: String {
+            switch self {
+            case .stable: tr("Stable", "Stable")
+            case .beta: tr("Bêta (préversions)", "Beta (pre-releases)")
+            }
+        }
+    }
+
+    /// Par défaut : Bêta si la version installée est elle-même une bêta.
+    var channel: Channel = UserDefaults.standard.string(forKey: Updater.channelKey).flatMap(Channel.init(rawValue:))
+        ?? ((Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String)?.contains("-") == true ? .beta : .stable) {
+        didSet { UserDefaults.standard.set(channel.rawValue, forKey: Self.channelKey) }
+    }
 
     struct Release: Sendable {
         let version: String          // "1.4.1"
@@ -92,7 +111,7 @@ final class Updater {
                 return
             }
 
-            let isNewer = release.version.compare(current, options: .numeric) == .orderedDescending
+            let isNewer = Self.isVersion(release.version, newerThan: current)
             let skipped = UserDefaults.standard.string(forKey: Self.skippedKey)
             guard isNewer, userInitiated || skipped != release.version else {
                 status = .upToDate
@@ -112,14 +131,46 @@ final class Updater {
         }
     }
 
+    /// Comparaison semver : 2.0.0 > 2.0.0-beta.2 > 2.0.0-beta.1 > 1.10.0.
+    nonisolated static func isVersion(_ a: String, newerThan b: String) -> Bool {
+        func split(_ v: String) -> (core: String, pre: String?) {
+            let v = v.hasPrefix("v") ? String(v.dropFirst()) : v
+            guard let dash = v.firstIndex(of: "-") else { return (v, nil) }
+            return (String(v[..<dash]), String(v[v.index(after: dash)...]))
+        }
+        let (ca, pa) = split(a), (cb, pb) = split(b)
+        switch ca.compare(cb, options: .numeric) {
+        case .orderedDescending: return true
+        case .orderedAscending: return false
+        case .orderedSame:
+            switch (pa, pb) {
+            case (nil, nil): return false
+            case (nil, _?): return true        // version finale > préversion
+            case (_?, nil): return false
+            case let (x?, y?): return x.compare(y, options: .numeric) == .orderedDescending
+            }
+        }
+    }
+
     private func fetchLatest() async throws -> Release {
-        var request = URLRequest(url: URL(string: "https://api.github.com/repos/\(Self.repository)/releases/latest")!)
+        // Canal bêta : /releases (préversions comprises), on garde la plus haute version.
+        let path = channel == .beta ? "releases?per_page=30" : "releases/latest"
+        var request = URLRequest(url: URL(string: "https://api.github.com/repos/\(Self.repository)/\(path)")!)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("SUSFetcher", forHTTPHeaderField: "User-Agent")
         request.timeoutInterval = 20
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200,
-              let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        let parsed = try JSONSerialization.jsonObject(with: data)
+        let candidate: [String: Any]?
+        if let list = parsed as? [[String: Any]] {
+            candidate = list
+                .filter { ($0["draft"] as? Bool) != true && $0["tag_name"] is String }
+                .max { Self.isVersion($1["tag_name"] as! String, newerThan: $0["tag_name"] as! String) }
+        } else {
+            candidate = parsed as? [String: Any]
+        }
+        guard let json = candidate,
               let tag = json["tag_name"] as? String,
               let page = (json["html_url"] as? String).flatMap(URL.init(string:)) else {
             throw URLError(.badServerResponse)
@@ -459,6 +510,9 @@ struct UpdatesSettingsSection: View {
             }
             Toggle(tr("Vérifier automatiquement (une fois par jour)", "Check automatically (once a day)"),
                    isOn: Binding(updater, \.automaticChecks))
+            Picker(tr("Canal", "Channel"), selection: Binding(updater, \.channel)) {
+                ForEach(Updater.Channel.allCases) { Text($0.label).tag($0) }
+            }
             HStack {
                 statusText
                 Spacer()
