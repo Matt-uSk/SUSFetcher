@@ -97,8 +97,8 @@ final class DFUTool {
         switch command {
         case .dfu:
             alert.messageText = tr("Passer l'appareil relié en mode DFU ?", "Put the connected device into DFU mode?")
-            alert.informativeText = tr("L'appareil relié à ce Mac en USB-C (Mac Apple Silicon, iPad ou iPhone) va s'éteindre immédiatement et redémarrer en DFU : tout travail non enregistré dessus sera perdu.\n\nCe Mac n'est pas concerné. Un mot de passe administrateur va être demandé.",
-                                       "The device connected to this Mac over USB-C (Apple silicon Mac, iPad or iPhone) will shut down immediately and restart in DFU: any unsaved work on it will be lost.\n\nThis Mac is not affected. An administrator password will be requested.")
+            alert.informativeText = tr("L'appareil relié à ce Mac en USB-C (Mac Apple Silicon ou iPad) va s'éteindre immédiatement et redémarrer en DFU : tout travail non enregistré dessus sera perdu.\n\nCe Mac n'est pas concerné. Un mot de passe administrateur va être demandé.",
+                                       "The device connected to this Mac over USB-C (Apple silicon Mac or iPad) will shut down immediately and restart in DFU: any unsaved work on it will be lost.\n\nThis Mac is not affected. An administrator password will be requested.")
             alert.addButton(withTitle: tr("Passer en DFU", "Enter DFU"))
         case .reboot:
             alert.messageText = tr("Redémarrer l'appareil relié ?", "Restart the connected device?")
@@ -145,7 +145,7 @@ enum ManualDFUGuide: String, CaseIterable, Identifiable {
 
     @MainActor var title: String {
         switch self {
-        case .faceID: tr("iPhone 8 et ultérieurs · iPad sans bouton principal (Lightning, ou sans second Mac)", "iPhone 8 and later · iPad without Home button (Lightning, or without a second Mac)")
+        case .faceID: tr("iPhone 8 et ultérieurs (USB-C compris) · iPad sans bouton principal", "iPhone 8 and later (USB-C included) · iPad without Home button")
         case .iPhone7: "iPhone 7 / 7 Plus"
         case .homeButton: tr("iPhone 6s et antérieurs · iPad avec bouton principal", "iPhone 6s and earlier · iPad with Home button")
         case .mac: tr("Mac Apple Silicon (sans second Mac)", "Apple silicon Mac (without a second Mac)")

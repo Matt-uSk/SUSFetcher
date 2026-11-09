@@ -2,6 +2,16 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.0.0-beta.4] - 2026-11-09
+
+Pre-release for testing — published on the beta channel only.
+
+### Added
+- **Settings › Appearance**: theme (moved from General) and **sidebar visibility** — show or hide each item (macOS Installers, Other, iPhone, iPad, Mac, Downloads, On This Mac, downloads mini-monitor, plugged-in devices, DFU Mode, “New Collection” button). Empty sections disappear; *Show All* restores everything.
+
+### Changed
+- DFU over USB-C: tested — works with Apple Silicon Macs and USB-C iPad; on a **USB-C iPhone only the restart works**, so the iPhone page no longer offers *Enter DFU* and the DFU Mode page points to the button guide for iPhone.
+
 ## [2.0.0-beta.3] - 2026-11-09
 
 Pre-release for testing — published on the beta channel only.

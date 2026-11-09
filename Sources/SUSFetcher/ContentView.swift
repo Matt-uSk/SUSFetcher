@@ -131,63 +131,91 @@ struct ContentView: View {
         }
         .onChange(of: catalog.channel) { catalog.reload() }
         .onChange(of: state.sidebar) { state.selection.removeAll() }
+        .onChange(of: AppSettings.shared.hiddenSidebar) {
+            if let current = state.sidebar, !current.isVisible {
+                state.sidebar = (SidebarItem.catalogItems + SidebarItem.ipswItems + [.downloads, .localFiles, .dfu])
+                    .first(where: \.isVisible)
+            }
+        }
         .environment(\.locale, AppSettings.shared.locale)
     }
 
     private var sidebarList: some View {
-        List(selection: Binding(state, \.sidebar)) {
+        let settings = AppSettings.shared
+        let catalogItems = SidebarItem.catalogItems.filter(\.isVisible)
+        let ipswItems = SidebarItem.ipswItems.filter(\.isVisible)
+        let activityItems: [SidebarItem] = [.downloads, .localFiles].filter(\.isVisible)
+        let showDevices = settings.isVisible(.devices)
+        let showDFU = settings.isVisible(.dfu)
+        return List(selection: Binding(state, \.sidebar)) {
             ForEach(Array(collections.collections.enumerated()), id: \.element.id) { index, c in
                 CollectionSection(collection: c,
                                   isFirst: index == 0,
                                   isLast: index == collections.collections.count - 1)
             }
-            Section(tr("Catalogue", "Catalog")) {
-                ForEach(SidebarItem.catalogItems) { item in
-                    SidebarRow(item: item, count: count(for: item))
-                        .tag(item)
+            if !catalogItems.isEmpty {
+                Section(tr("Catalogue", "Catalog")) {
+                    ForEach(catalogItems) { item in
+                        SidebarRow(item: item, count: count(for: item))
+                            .tag(item)
+                    }
                 }
             }
-            Section(tr("Firmwares (IPSW)", "Firmwares (IPSW)")) {
-                ForEach(SidebarItem.ipswItems) { item in
-                    SidebarRow(item: item, count: count(for: item))
-                        .tag(item)
+            if !ipswItems.isEmpty {
+                Section(tr("Firmwares (IPSW)", "Firmwares (IPSW)")) {
+                    ForEach(ipswItems) { item in
+                        SidebarRow(item: item, count: count(for: item))
+                            .tag(item)
+                    }
                 }
             }
-            Section(tr("Activité", "Activity")) {
-                SidebarRow(item: .downloads, count: downloads.pendingCount)
-                    .tag(SidebarItem.downloads)
-                SidebarRow(item: .localFiles, count: LocalFiles.shared.allFiles.count)
-                    .tag(SidebarItem.localFiles)
+            if !activityItems.isEmpty {
+                Section(tr("Activité", "Activity")) {
+                    ForEach(activityItems) { item in
+                        SidebarRow(item: item, count: count(for: item))
+                            .tag(item)
+                    }
+                }
             }
-            Section(tr("Appareils connectés", "Connected Devices")) {
-                let connected = ConnectedDevices.shared
-                ForEach(connected.devices) { d in
-                    ConnectedDeviceRow(device: d, devices: connected)
-                        .tag(SidebarItem.device(d.id))
+            if showDevices || showDFU {
+                Section(tr("Appareils connectés", "Connected Devices")) {
+                    let connected = ConnectedDevices.shared
+                    if showDevices {
+                        ForEach(connected.devices) { d in
+                            ConnectedDeviceRow(device: d, devices: connected)
+                                .tag(SidebarItem.device(d.id))
+                        }
+                        if connected.devices.isEmpty {
+                            Label(tr("Aucun appareil branché", "No device connected"), systemImage: "cable.connector")
+                                .foregroundStyle(.tertiary)
+                                .help(tr("Branchez un iPhone, un iPad, ou un appareil en DFU / Recovery.",
+                                         "Connect an iPhone, an iPad, or a device in DFU / Recovery."))
+                        }
+                    }
+                    if showDFU {
+                        SidebarRow(item: .dfu, count: 0)
+                            .tag(SidebarItem.dfu)
+                    }
                 }
-                if connected.devices.isEmpty {
-                    Label(tr("Aucun appareil branché", "No device connected"), systemImage: "cable.connector")
-                        .foregroundStyle(.tertiary)
-                        .help(tr("Branchez un iPhone, un iPad, ou un appareil en DFU / Recovery.",
-                                 "Connect an iPhone, an iPad, or a device in DFU / Recovery."))
-                }
-                SidebarRow(item: .dfu, count: 0)
-                    .tag(SidebarItem.dfu)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
-                Button {
-                    collections.createInteractively()
-                } label: {
-                    Label(tr("Nouvelle collection", "New Collection"), systemImage: "plus")
-                        .font(.callout)
+                if settings.isVisible(.newCollection) {
+                    Button {
+                        collections.createInteractively()
+                    } label: {
+                        Label(tr("Nouvelle collection", "New Collection"), systemImage: "plus")
+                            .font(.callout)
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
                 }
-                .buttonStyle(.borderless)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                SidebarDownloadsMonitor(downloads: downloads) { state.showDownloads() }
+                if settings.isVisible(.downloadsMonitor) {
+                    SidebarDownloadsMonitor(downloads: downloads) { state.showDownloads() }
+                }
             }
         }
         .navigationSplitViewColumnWidth(min: 200, ideal: 230)

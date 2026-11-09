@@ -89,6 +89,22 @@ final class AppSettings {
         static let customCatalog = "customCatalogURL"
         static let ipswNaming = "ipswNaming"
         static let ipswCustomTemplate = "ipswCustomTemplate"
+        static let hiddenSidebar = "hiddenSidebarElements"
+    }
+
+    /// Éléments de la barre latérale masqués par l'utilisateur (onglet Apparence).
+    var hiddenSidebar: Set<String> {
+        didSet { UserDefaults.standard.set(Array(hiddenSidebar).sorted(), forKey: Key.hiddenSidebar) }
+    }
+
+    func isVisible(_ element: SidebarElement) -> Bool { !hiddenSidebar.contains(element.rawValue) }
+
+    func visibility(_ element: SidebarElement) -> Binding<Bool> {
+        Binding(get: { self.isVisible(element) },
+                set: { visible in
+                    if visible { self.hiddenSidebar.remove(element.rawValue) }
+                    else { self.hiddenSidebar.insert(element.rawValue) }
+                })
     }
 
     var language: AppLanguage {
@@ -146,6 +162,7 @@ final class AppSettings {
         customCatalog = d.string(forKey: Key.customCatalog) ?? ""
         ipswNaming = d.string(forKey: Key.ipswNaming).flatMap(IPSWNaming.init(rawValue:)) ?? .readable
         ipswCustomTemplate = d.string(forKey: Key.ipswCustomTemplate) ?? "{model}-{os}{version}-{build}"
+        hiddenSidebar = Set(d.stringArray(forKey: Key.hiddenSidebar) ?? [])
     }
 
     var isFrench: Bool {
@@ -287,6 +304,13 @@ struct SettingsView: View {
             .formStyle(.grouped)
             .tabItem { Label(tr("Général", "General"), systemImage: "gearshape") }
 
+            Form {
+                appearanceSection
+                sidebarSections
+            }
+            .formStyle(.grouped)
+            .tabItem { Label(tr("Apparence", "Appearance"), systemImage: "paintbrush") }
+
             Form { downloadsSection }
                 .formStyle(.grouped)
                 .tabItem { Label(tr("Téléchargements", "Downloads"), systemImage: "arrow.down.circle") }
@@ -317,10 +341,36 @@ struct SettingsView: View {
             Picker(tr("Langue", "Language"), selection: Binding(settings, \.language)) {
                 ForEach(AppLanguage.allCases) { Text($0.label).tag($0) }
             }
+        }
+    }
+
+    private var appearanceSection: some View {
+        Section(tr("Thème", "Theme")) {
             Picker(tr("Apparence", "Appearance"), selection: Binding(settings, \.appearance)) {
                 ForEach(AppAppearance.allCases) { Text($0.label).tag($0) }
             }
             .pickerStyle(.segmented)
+        }
+    }
+
+    @ViewBuilder
+    private var sidebarSections: some View {
+        ForEach(SidebarElement.groups, id: \.title) { group in
+            Section(group.title) {
+                ForEach(group.elements) { e in
+                    Toggle(isOn: settings.visibility(e)) {
+                        Label(e.label, systemImage: e.icon)
+                    }
+                }
+            }
+        }
+        Section {
+            Button(tr("Tout afficher", "Show All")) { settings.hiddenSidebar.removeAll() }
+                .disabled(settings.hiddenSidebar.isEmpty)
+        } footer: {
+            Text(tr("Les collections se gèrent depuis leur menu ⚙︎ dans la barre latérale.",
+                    "Collections are managed from their ⚙︎ menu in the sidebar."))
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -477,4 +527,73 @@ func chooseFolder(for downloads: DownloadManager) {
     if panel.runModal() == .OK, let url = panel.url {
         downloads.destinationFolder = url
     }
+}
+
+/// Ce que l'on peut masquer dans la barre latérale.
+enum SidebarElement: String, CaseIterable, Identifiable {
+    case installers, others, iphone, ipad, mac, downloads, localFiles, downloadsMonitor
+    case devices, dfu, newCollection
+    var id: String { rawValue }
+
+    struct Group { let title: String; let elements: [SidebarElement] }
+
+    @MainActor static var groups: [Group] {
+        [Group(title: tr("Catalogue", "Catalog"), elements: [.installers, .others]),
+         Group(title: tr("Firmwares (IPSW)", "Firmwares (IPSW)"), elements: [.iphone, .ipad, .mac]),
+         Group(title: tr("Activité", "Activity"), elements: [.downloads, .localFiles, .downloadsMonitor]),
+         Group(title: tr("Appareils connectés", "Connected Devices"), elements: [.devices, .dfu]),
+         Group(title: tr("Divers", "Other"), elements: [.newCollection])]
+    }
+
+    @MainActor var label: String {
+        switch self {
+        case .installers: tr("Installers macOS", "macOS Installers")
+        case .others: tr("Autres", "Other")
+        case .iphone: "iPhone"
+        case .ipad: "iPad"
+        case .mac: tr("Mac (Apple Silicon)", "Mac (Apple Silicon)")
+        case .downloads: tr("Téléchargements", "Downloads")
+        case .localFiles: tr("Sur ce Mac", "On This Mac")
+        case .downloadsMonitor: tr("Mini-moniteur de téléchargements (en bas)", "Downloads mini-monitor (bottom)")
+        case .devices: tr("Appareils branchés", "Plugged-in devices")
+        case .dfu: tr("Mode DFU", "DFU Mode")
+        case .newCollection: tr("Bouton « Nouvelle collection »", "“New Collection” button")
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .installers: "laptopcomputer.and.arrow.down"
+        case .others: "shippingbox"
+        case .iphone: "iphone"
+        case .ipad: "ipad"
+        case .mac: "laptopcomputer"
+        case .downloads: "arrow.down.circle"
+        case .localFiles: "internaldrive"
+        case .downloadsMonitor: "gauge.with.dots.needle.33percent"
+        case .devices: "cable.connector"
+        case .dfu: "bolt.horizontal.circle"
+        case .newCollection: "plus"
+        }
+    }
+}
+
+extension SidebarItem {
+    /// Élément de réglage correspondant (nil : toujours visible, ex. collections).
+    var element: SidebarElement? {
+        switch self {
+        case .installers: .installers
+        case .others: .others
+        case .iphone: .iphone
+        case .ipad: .ipad
+        case .mac: .mac
+        case .downloads: .downloads
+        case .localFiles: .localFiles
+        case .dfu: .dfu
+        case .device: .devices
+        case .collectionItem: nil
+        }
+    }
+
+    @MainActor var isVisible: Bool { element.map { AppSettings.shared.isVisible($0) } ?? true }
 }

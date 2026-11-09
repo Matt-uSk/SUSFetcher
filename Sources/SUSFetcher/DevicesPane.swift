@@ -133,15 +133,15 @@ struct DevicePane: View {
     private func actions(_ d: ConnectedDevice, identifier: String?) -> some View {
         let tool = DFUTool.shared
         VStack(alignment: .trailing, spacing: 6) {
-            if d.mode == .normal {
+            if d.mode == .normal, identifier?.hasPrefix("iPad") ?? (d.deviceClass == "iPad") {
                 Button {
                     tool.run(.dfu)
                 } label: {
                     Label(tr("Passer en DFU", "Enter DFU"), systemImage: "bolt.horizontal.circle.fill")
                 }
                 .disabled(tool.unavailableReason != nil || tool.running != nil)
-                .help(tool.unavailableReason ?? tr("Appareils USB-C uniquement (iPad USB-C, iPhone 15 et ultérieurs). Lightning : combinaison de boutons.",
-                                                   "USB-C devices only (USB-C iPad, iPhone 15 and later). Lightning: button combination."))
+                .help(tool.unavailableReason ?? tr("iPad USB-C uniquement. iPad Lightning : combinaison de boutons.",
+                                                   "USB-C iPad only. Lightning iPad: button combination."))
             } else {
                 Button {
                     tool.run(.reboot)
@@ -232,8 +232,8 @@ struct DFUOutcomeBanner: View {
         switch (outcome.status, outcome.command) {
         case (.success, .dfu): tr("Commande DFU envoyée : l'appareil relié redémarre en DFU.", "DFU command sent: the connected device is restarting in DFU.")
         case (.success, .reboot): tr("Redémarrage envoyé à l'appareil relié.", "Restart sent to the connected device.")
-        case (.unconfirmed, .dfu): tr("Commande envoyée, sans accusé de réception (fréquent avec un iPad / iPhone qui redémarre aussitôt) : vérifiez que l'appareil apparaît en DFU.",
-                                      "Command sent without acknowledgement (common with an iPad / iPhone that restarts right away): check that the device shows up in DFU.")
+        case (.unconfirmed, .dfu): tr("Commande envoyée, sans accusé de réception (fréquent avec un iPad qui redémarre aussitôt) : vérifiez que l'appareil apparaît en DFU.",
+                                      "Command sent without acknowledgement (common with an iPad that restarts right away): check that the device shows up in DFU.")
         case (.unconfirmed, .reboot): tr("Redémarrage envoyé (sans accusé de réception).", "Restart sent (no acknowledgement).")
         case (.failed, _): tr("Échec de la commande", "Command failed")
         }
@@ -334,8 +334,8 @@ struct DFUPane: View {
     private var macSection: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
-                Text(tr("Ce Mac envoie la commande DFU à l'appareil relié par un câble USB-C, sans toucher à ses boutons (comme Apple Configurator ou DFU Blaster). Fonctionne avec les Mac Apple Silicon et les iPad / iPhone à port USB-C (iPhone 15 et ultérieurs) ; pas avec les appareils Lightning.",
-                        "This Mac sends the DFU command to the device connected with a USB-C cable, without touching its buttons (like Apple Configurator or DFU Blaster). Works with Apple silicon Macs and USB-C iPad / iPhone (iPhone 15 and later); not with Lightning devices."))
+                Text(tr("Ce Mac envoie la commande DFU à l'appareil relié par un câble USB-C, sans toucher à ses boutons (comme Apple Configurator ou DFU Blaster). Fonctionne avec les Mac Apple Silicon et les iPad USB-C. iPhone USB-C : seul le redémarrage fonctionne (DFU avec les boutons, voir plus bas). Appareils Lightning : non pris en charge.",
+                        "This Mac sends the DFU command to the device connected with a USB-C cable, without touching its buttons (like Apple Configurator or DFU Blaster). Works with Apple silicon Macs and USB-C iPad. USB-C iPhone: only restart works (DFU using the buttons, see below). Lightning devices: not supported."))
                 VStack(alignment: .leading, spacing: 3) {
                     Text(tr("Branchez le câble sur le port DFU de ce Mac, et pour un Mac cible, sur son port DFU aussi :",
                             "Plug the cable into this Mac's DFU port, and for a target Mac, into its DFU port too:")).bold()
@@ -377,7 +377,7 @@ struct DFUPane: View {
             .padding(6)
             .frame(maxWidth: .infinity, alignment: .leading)
         } label: {
-            Label(tr("Appareil USB-C relié à ce Mac (Mac, iPad, iPhone)", "USB-C device connected to this Mac (Mac, iPad, iPhone)"), systemImage: "cable.connector.horizontal")
+            Label(tr("Mac ou iPad relié en USB-C", "Mac or iPad connected over USB-C"), systemImage: "cable.connector.horizontal")
         }
     }
 }
