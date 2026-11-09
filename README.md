@@ -19,8 +19,8 @@ Native macOS app (Swift/SwiftUI, Universal — Apple Silicon & Intel, macOS 14+,
 - Downloads page + mini monitor at the bottom of the sidebar: progress, speed, time remaining, **pause / resume**, cancel, retry
 - Confirmation before quitting while downloads are in progress
 - Download queue with a configurable number of simultaneous downloads
-- **Connected devices** *(2.0 beta)*: iPhone, iPad and any Apple device in DFU / Recovery (Apple Silicon Macs included) show up at the bottom of the sidebar, identified automatically, with their matching firmwares and an “up to date / update available” status
-- **DFU mode** *(2.0 beta)*: put an Apple Silicon Mac connected to this Mac into DFU (or restart it) in one click — no key combination; step-by-step button guides for iPhone / iPad
+- **Connected devices**: iPhone, iPad and any Apple device in DFU / Recovery (Apple Silicon Macs included) show up at the bottom of the sidebar, identified automatically, with their matching firmwares and an “up to date / update available” status
+- **DFU mode**: put an Apple Silicon Mac or a USB-C iPad connected to this Mac into DFU (or restart it) in one click — no key combination; step-by-step button guides for iPhone / iPad
 - **On This Mac**: files already downloaded, identified (even renamed), with “newer version available” badges
 - Files already in the destination folder are detected (**✓ Downloaded**), even renamed (size + checksum), instead of being downloaded again
 - “Other” products: package menu, saved into `<Title> <version> [<Product ID>]/`

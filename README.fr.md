@@ -19,8 +19,8 @@ App macOS native (Swift/SwiftUI, Universal — Apple Silicon et Intel, macOS 14+
 - Page Téléchargements + mini-moniteur en bas de la sidebar : progression, vitesse, temps restant, **pause / reprise**, annulation, réessai
 - Confirmation avant de quitter si des téléchargements sont en cours
 - File d'attente avec un nombre de téléchargements simultanés configurable
-- **Appareils connectés** *(bêta 2.0)* : iPhone, iPad et tout appareil Apple en DFU / Recovery (Mac Apple Silicon compris) apparaissent en bas de la barre latérale, identifiés automatiquement, avec leurs firmwares et un statut « à jour / mise à jour disponible »
-- **Mode DFU** *(bêta 2.0)* : passer en DFU (ou redémarrer) un Mac Apple Silicon relié à ce Mac en un clic, sans combinaison de touches ; guides pas à pas pour iPhone / iPad
+- **Appareils connectés** : iPhone, iPad et tout appareil Apple en DFU / Recovery (Mac Apple Silicon compris) apparaissent en bas de la barre latérale, identifiés automatiquement, avec leurs firmwares et un statut « à jour / mise à jour disponible »
+- **Mode DFU** : passer en DFU (ou redémarrer) un Mac Apple Silicon ou un iPad USB-C relié à ce Mac en un clic, sans combinaison de touches ; guides pas à pas pour iPhone / iPad
 - **Sur ce Mac** : les fichiers déjà téléchargés, identifiés (même renommés), avec un badge « version plus récente disponible »
 - Détection des fichiers déjà présents dans le dossier de destination (**✓ Présent**), même renommés (taille + empreinte), pour éviter de les retélécharger
 - Produits « Autres » : menu des paquets, rangés dans `<Titre> <version> [<Product ID>]/`
