@@ -370,8 +370,13 @@ struct DFUPane: View {
 
                 if let outcome = tool.lastOutcome { DFUOutcomeBanner(outcome: outcome) }
 
-                Text(tr("Mot de passe administrateur requis. Outil : macvdmtool (Asahi Linux, licence Apache 2.0).",
-                        "Administrator password required. Tool: macvdmtool (Asahi Linux, Apache 2.0 license)."))
+                if tool.unavailableReason == nil {
+                    Divider()
+                    passwordlessSection
+                }
+
+                Text(tr("Outil : macvdmtool (Asahi Linux, licence Apache 2.0).",
+                        "Tool: macvdmtool (Asahi Linux, Apache 2.0 license)."))
                     .font(.caption).foregroundStyle(.secondary)
             }
             .padding(6)
@@ -401,6 +406,50 @@ extension DFUPane {
             lines += ["", "## Dernière commande DFU : \(o.command.rawValue) \(o.status)", o.output]
         }
         return lines.joined(separator: "\n")
+    }
+}
+
+extension DFUPane {
+    @ViewBuilder
+    var passwordlessSection: some View {
+        let biometry = tool.biometryName
+        VStack(alignment: .leading, spacing: 8) {
+            if tool.passwordless {
+                Label(tr("Sans mot de passe administrateur", "No administrator password"), systemImage: "checkmark.shield.fill")
+                    .foregroundStyle(.green)
+                    .font(.callout.weight(.semibold))
+                Toggle(isOn: Binding(tool, \.biometricConfirmation)) {
+                    Text(biometry.map { tr("Confirmer chaque commande avec \($0)", "Confirm each command with \($0)") }
+                         ?? tr("Confirmer chaque commande avec le mot de passe de session", "Confirm each command with your login password"))
+                }
+                .toggleStyle(.checkbox)
+                HStack {
+                    if tool.installedOutdated {
+                        Button(tr("Mettre à jour l'outil installé", "Update Installed Tool")) { tool.installPasswordless() }
+                    }
+                    Button(tr("Désactiver", "Disable")) { tool.uninstallPasswordless() }
+                    if tool.installing { ProgressView().controlSize(.small) }
+                }
+                .controlSize(.small)
+            } else {
+                Text(tr("Ne plus taper le mot de passe administrateur : l'outil est installé une fois pour toutes dans un dossier système protégé, avec une règle sudo limitée à ses deux commandes (DFU et redémarrage). Chaque commande se confirme ensuite\(biometry.map { " avec \($0)" } ?? " avec le mot de passe de session").",
+                        "Stop typing the administrator password: the tool is installed once in a protected system folder, with a sudo rule limited to its two commands (DFU and restart). Each command is then confirmed\(biometry.map { " with \($0)" } ?? " with your login password")."))
+                    .font(.callout)
+                HStack {
+                    Button {
+                        tool.installPasswordless()
+                    } label: {
+                        Label(tr("Activer (mot de passe une dernière fois)", "Enable (password one last time)"), systemImage: biometry == nil ? "key" : "touchid")
+                    }
+                    if tool.installing { ProgressView().controlSize(.small) }
+                }
+                .controlSize(.small)
+            }
+            if let error = tool.installError {
+                Text(error).font(.caption.monospaced()).foregroundStyle(.red).textSelection(.enabled)
+            }
+        }
+        .onAppear { tool.refreshInstallState() }
     }
 }
 
