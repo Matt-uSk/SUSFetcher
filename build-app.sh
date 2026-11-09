@@ -14,12 +14,17 @@ ARCH_FLAGS=()
 for a in $ARCHS; do ARCH_FLAGS+=(--arch "$a"); done
 
 swift build -c release "${ARCH_FLAGS[@]}"
-BIN="$(swift build -c release "${ARCH_FLAGS[@]}" --show-bin-path)/SUSFetcher"
+BIN_DIR="$(swift build -c release "${ARCH_FLAGS[@]}" --show-bin-path)"
+BIN="$BIN_DIR/SUSFetcher"
 
 APP="build/SUS Fetcher.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/SUSFetcher"
+# Outil DFU (macvdmtool, Apache-2.0) + sa licence
+cp "$BIN_DIR/macvdmtool" "$APP/Contents/MacOS/macvdmtool"
+mkdir -p "$APP/Contents/Resources/ThirdParty/macvdmtool"
+cp ThirdParty/macvdmtool/LICENSE ThirdParty/macvdmtool/NOTICE "$APP/Contents/Resources/ThirdParty/macvdmtool/"
 echo "Architectures : $(lipo -archs "$APP/Contents/MacOS/SUSFetcher")"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 

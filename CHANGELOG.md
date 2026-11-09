@@ -2,6 +2,56 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.0.0] - 2026-11-09
+
+### Added
+- **Connected Devices** (bottom of the sidebar): iPhone and iPad plugged in over USB appear with their name, model and iOS version. Devices in **DFU or Recovery** — Apple Silicon Macs included — are detected through MobileDevice (as in Finder / Apple Configurator) and identified from their chip (CPID/BDID).
+- **Device page**: model, identifier, UDID / ECID (click to copy), **up to date / update available** status (or the latest signed version to restore with), and its firmwares ready to download. The page stays selected when the device switches to DFU.
+- **DFU Mode**: put an **Apple Silicon Mac or a USB-C iPad** connected to this Mac into DFU in one click, or restart it to leave DFU — no key combination (bundled [macvdmtool](https://github.com/AsahiLinux/macvdmtool), Apache 2.0; requires an Apple Silicon Mac and an administrator password). On a USB-C iPhone only the restart works. Step-by-step button guides for iPhone / iPad and for a Mac without a second Mac. **Copy Diagnostics** button for bug reports.
+- **Settings › Appearance**: theme, and **show / hide each sidebar item**.
+- Updater: **update channel** (Stable / Beta) — pre-releases are opt-in; version comparison understands pre-releases.
+
+## [2.0.0-beta.4] - 2026-11-09
+
+Pre-release for testing — published on the beta channel only.
+
+### Added
+- **Settings › Appearance**: theme (moved from General) and **sidebar visibility** — show or hide each item (macOS Installers, Other, iPhone, iPad, Mac, Downloads, On This Mac, downloads mini-monitor, plugged-in devices, DFU Mode, “New Collection” button). Empty sections disappear; *Show All* restores everything.
+
+### Changed
+- DFU over USB-C: tested — works with Apple Silicon Macs and USB-C iPad; on a **USB-C iPhone only the restart works**, so the iPhone page no longer offers *Enter DFU* and the DFU Mode page points to the button guide for iPhone.
+
+## [2.0.0-beta.3] - 2026-11-09
+
+Pre-release for testing — published on the beta channel only.
+
+### Changed
+- **DFU over USB-C isn't just for Macs**: the DFU command also works with **USB-C iPad and iPhone** (iPhone 15 and later). The DFU Mode page and dialogs now say so, and a connected iPhone / iPad page has an **Enter DFU** button (and **Exit DFU** once in DFU).
+- A device's page stays selected when it switches to DFU / Recovery (devices are now tracked by ECID).
+
+### Fixed
+- “Command failed” shown although the iPad did enter DFU: an iPad / iPhone restarts so fast that it never acknowledges the command. When the command was sent, the app now waits for the device to show up in DFU and reports success — or “sent, not acknowledged” instead of an error.
+
+## [2.0.0-beta.2] - 2026-11-09
+
+Pre-release for testing — published on the beta channel only.
+
+### Fixed
+- **Apple Silicon Mac in DFU not showing in Connected Devices.** Connected to another Apple Silicon Mac, a Mac in DFU doesn't appear as a standard USB DFU device but behind Apple's “Debug USB” interface. Devices in DFU / Recovery are now read through **MobileDevice** (the framework used by Finder and Apple Configurator), which reports their ECID, chip and board — so the Mac is detected and identified. The previous USB detection remains as a fallback.
+
+### Added
+- DFU Mode page: **Copy Diagnostics** button (detected devices, MobileDevice events, Apple USB devices, last DFU command output) to attach to a bug report.
+
+## [2.0.0-beta.1] - 2026-11-09
+
+Pre-release for testing — published on the beta channel only.
+
+### Added
+- **Connected Devices** (bottom of the sidebar): iPhone and iPad plugged in over USB appear with their name, model and iOS version (read from the device, no pairing needed). Devices in **DFU or Recovery** — Apple Silicon Macs included — are detected too and identified from their chip (CPID/BDID).
+- Clicking a device opens its page: model, identifier, UDID / ECID (click to copy), **up to date / update available** status (or the latest signed version to restore with), and its firmwares ready to download.
+- **DFU Mode** page: **put an Apple Silicon Mac connected to this Mac into DFU** in one click, or restart it to leave DFU (bundled [macvdmtool](https://github.com/AsahiLinux/macvdmtool), Apache 2.0; requires an Apple Silicon Mac, both Macs connected through their DFU ports, and an administrator password). Step-by-step button guides for iPhone / iPad (no software DFU exists for those) and for a Mac without a second Mac.
+- Updater: **update channel** setting (Stable / Beta). Beta builds follow the Beta channel by default; version comparison now understands pre-releases (2.0.0 > 2.0.0-beta.2 > 2.0.0-beta.1).
+
 ## [1.10.0] - 2026-11-06
 
 ### Added
