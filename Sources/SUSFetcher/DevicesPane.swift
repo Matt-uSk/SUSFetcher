@@ -131,24 +131,30 @@ struct DevicePane: View {
 
     @ViewBuilder
     private func actions(_ d: ConnectedDevice, identifier: String?) -> some View {
-        let isMac = identifier.map { IPSWFamily.mac.matches($0) } ?? false
+        let tool = DFUTool.shared
         VStack(alignment: .trailing, spacing: 6) {
-            if isMac && d.mode != .normal {
-                let tool = DFUTool.shared
+            if d.mode == .normal {
+                Button {
+                    tool.run(.dfu)
+                } label: {
+                    Label(tr("Passer en DFU", "Enter DFU"), systemImage: "bolt.horizontal.circle.fill")
+                }
+                .disabled(tool.unavailableReason != nil || tool.running != nil)
+                .help(tool.unavailableReason ?? tr("Appareils USB-C uniquement (iPad USB-C, iPhone 15 et ultérieurs). Lightning : combinaison de boutons.",
+                                                   "USB-C devices only (USB-C iPad, iPhone 15 and later). Lightning: button combination."))
+            } else {
                 Button {
                     tool.run(.reboot)
                 } label: {
                     Label(tr("Quitter le DFU (redémarrer)", "Exit DFU (restart)"), systemImage: "arrow.clockwise.circle")
                 }
                 .disabled(tool.unavailableReason != nil || tool.running != nil)
-                .help(tool.unavailableReason ?? tr("Redémarre le Mac relié par son port DFU", "Restarts the Mac connected through its DFU port"))
+                .help(tool.unavailableReason ?? tr("Redémarre l'appareil relié en USB-C", "Restarts the device connected over USB-C"))
             }
-            if d.mode == .normal || !isMac {
-                Button {
-                    state.sidebar = .dfu
-                } label: {
-                    Label(tr("Mode DFU…", "DFU Mode…"), systemImage: "bolt.horizontal.circle")
-                }
+            Button {
+                state.sidebar = .dfu
+            } label: {
+                Label(tr("Aide DFU…", "DFU Help…"), systemImage: "questionmark.circle")
             }
         }
         .controlSize(.small)
@@ -206,13 +212,9 @@ struct DFUOutcomeBanner: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Label(outcome.success
-                  ? (outcome.command == .dfu ? tr("Commande DFU envoyée : le Mac relié redémarre en DFU.", "DFU command sent: the connected Mac is restarting in DFU.")
-                                             : tr("Redémarrage envoyé au Mac relié.", "Restart sent to the connected Mac."))
-                  : tr("Échec de la commande", "Command failed"),
-                  systemImage: outcome.success ? "checkmark.circle.fill" : "xmark.octagon.fill")
-                .foregroundStyle(outcome.success ? Color.green : Color.red)
-            if !outcome.success, !outcome.output.isEmpty {
+            Label(title, systemImage: icon)
+                .foregroundStyle(color)
+            if outcome.status == .failed, !outcome.output.isEmpty {
                 Text(outcome.output)
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
@@ -223,7 +225,34 @@ struct DFUOutcomeBanner: View {
         .font(.callout)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 8).fill((outcome.success ? Color.green : Color.red).opacity(0.08)))
+        .background(RoundedRectangle(cornerRadius: 8).fill(color.opacity(0.08)))
+    }
+
+    private var title: String {
+        switch (outcome.status, outcome.command) {
+        case (.success, .dfu): tr("Commande DFU envoyée : l'appareil relié redémarre en DFU.", "DFU command sent: the connected device is restarting in DFU.")
+        case (.success, .reboot): tr("Redémarrage envoyé à l'appareil relié.", "Restart sent to the connected device.")
+        case (.unconfirmed, .dfu): tr("Commande envoyée, sans accusé de réception (fréquent avec un iPad / iPhone qui redémarre aussitôt) : vérifiez que l'appareil apparaît en DFU.",
+                                      "Command sent without acknowledgement (common with an iPad / iPhone that restarts right away): check that the device shows up in DFU.")
+        case (.unconfirmed, .reboot): tr("Redémarrage envoyé (sans accusé de réception).", "Restart sent (no acknowledgement).")
+        case (.failed, _): tr("Échec de la commande", "Command failed")
+        }
+    }
+
+    private var icon: String {
+        switch outcome.status {
+        case .success: "checkmark.circle.fill"
+        case .unconfirmed: "questionmark.circle.fill"
+        case .failed: "xmark.octagon.fill"
+        }
+    }
+
+    private var color: Color {
+        switch outcome.status {
+        case .success: .green
+        case .unconfirmed: .orange
+        case .failed: .red
+        }
     }
 }
 
@@ -305,10 +334,11 @@ struct DFUPane: View {
     private var macSection: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
-                Text(tr("Ce Mac envoie la commande DFU au Mac relié par câble USB-C, sans toucher au clavier de la cible (comme Apple Configurator ou DFU Blaster).",
-                        "This Mac sends the DFU command to the Mac connected with a USB-C cable, without touching the target's keyboard (like Apple Configurator or DFU Blaster)."))
+                Text(tr("Ce Mac envoie la commande DFU à l'appareil relié par un câble USB-C, sans toucher à ses boutons (comme Apple Configurator ou DFU Blaster). Fonctionne avec les Mac Apple Silicon et les iPad / iPhone à port USB-C (iPhone 15 et ultérieurs) ; pas avec les appareils Lightning.",
+                        "This Mac sends the DFU command to the device connected with a USB-C cable, without touching its buttons (like Apple Configurator or DFU Blaster). Works with Apple silicon Macs and USB-C iPad / iPhone (iPhone 15 and later); not with Lightning devices."))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(tr("Reliez les deux Mac par leurs ports DFU :", "Connect both Macs through their DFU ports:")).bold()
+                    Text(tr("Branchez le câble sur le port DFU de ce Mac, et pour un Mac cible, sur son port DFU aussi :",
+                            "Plug the cable into this Mac's DFU port, and for a target Mac, into its DFU port too:")).bold()
                     Text(tr("• MacBook Air et MacBook Pro 13\" : le port arrière gauche", "• MacBook Air and 13\" MacBook Pro: the rear left port"))
                     Text(tr("• MacBook Pro 14\" et 16\" : le port à côté du MagSafe", "• 14\" and 16\" MacBook Pro: the port next to MagSafe"))
                     Text(tr("• Mac mini, Mac Studio, iMac… : voir la liste d'Apple", "• Mac mini, Mac Studio, iMac…: see Apple's list"))
@@ -347,7 +377,7 @@ struct DFUPane: View {
             .padding(6)
             .frame(maxWidth: .infinity, alignment: .leading)
         } label: {
-            Label(tr("Mac Apple Silicon relié à ce Mac", "Apple silicon Mac connected to this Mac"), systemImage: "laptopcomputer.and.arrow.down")
+            Label(tr("Appareil USB-C relié à ce Mac (Mac, iPad, iPhone)", "USB-C device connected to this Mac (Mac, iPad, iPhone)"), systemImage: "cable.connector.horizontal")
         }
     }
 }
@@ -368,7 +398,7 @@ extension DFUPane {
         lines += ["", "## USB Apple (IOKit)"]
         lines += IOKitUSB.appleUSBSummary().map { "- " + $0 }
         if let o = tool.lastOutcome {
-            lines += ["", "## Dernière commande DFU : \(o.command.rawValue) \(o.success ? "OK" : "échec")", o.output]
+            lines += ["", "## Dernière commande DFU : \(o.command.rawValue) \(o.status)", o.output]
         }
         return lines.joined(separator: "\n")
     }

@@ -10,7 +10,7 @@ import Observation
 struct ConnectedDevice: Identifiable, Hashable, Sendable {
     enum Mode: String, Sendable { case normal, recovery, dfu }
 
-    let id: String             // UDID (mode normal) ou ECID (DFU / Recovery)
+    let id: String             // ECID (sinon UDID) : stable entre mode normal et DFU / Recovery
     var mode: Mode
     var productType: String?   // « iPhone18,1 » (mode normal uniquement)
     var deviceName: String?    // nom donné par l'utilisateur
@@ -101,7 +101,9 @@ actor DeviceProbe {
                 lockdownCache[udid] = values
             }
             let v = lockdownCache[udid] ?? [:]
-            result.append(ConnectedDevice(id: udid, mode: .normal,
+            // Id = ECID quand on le connaît : la fiche reste sélectionnée quand l'appareil passe en DFU.
+            let ecidID = v["UniqueChipID"].flatMap { UInt64($0) }.map(formatECID)
+            result.append(ConnectedDevice(id: ecidID ?? udid, mode: .normal,
                                           productType: v["ProductType"], deviceName: v["DeviceName"],
                                           deviceClass: v["DeviceClass"], osVersion: v["ProductVersion"],
                                           build: v["BuildVersion"],

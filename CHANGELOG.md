@@ -2,6 +2,17 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.0.0-beta.3] - 2026-11-09
+
+Pre-release for testing — published on the beta channel only.
+
+### Changed
+- **DFU over USB-C isn't just for Macs**: the DFU command also works with **USB-C iPad and iPhone** (iPhone 15 and later). The DFU Mode page and dialogs now say so, and a connected iPhone / iPad page has an **Enter DFU** button (and **Exit DFU** once in DFU).
+- A device's page stays selected when it switches to DFU / Recovery (devices are now tracked by ECID).
+
+### Fixed
+- “Command failed” shown although the iPad did enter DFU: an iPad / iPhone restarts so fast that it never acknowledges the command. When the command was sent, the app now waits for the device to show up in DFU and reports success — or “sent, not acknowledged” instead of an error.
+
 ## [2.0.0-beta.2] - 2026-11-09
 
 Pre-release for testing — published on the beta channel only.

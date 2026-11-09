@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import Observation
 
-/// Passage d'un Mac Apple Silicon en DFU depuis ce Mac, via l'outil embarqué macvdmtool
+/// Passage en DFU d'un appareil USB-C (Mac Apple Silicon, iPad / iPhone USB-C) depuis ce Mac, via l'outil embarqué macvdmtool
 /// (Asahi Linux, Apache-2.0) : il envoie une commande USB-PD « VDM » au contrôleur USB-C de la cible.
 ///
 /// Conditions : ce Mac est lui-même Apple Silicon, les deux Mac sont reliés par leurs ports DFU,
@@ -17,17 +17,19 @@ final class DFUTool {
 
         @MainActor var label: String {
             switch self {
-            case .dfu: tr("Passer le Mac relié en DFU", "Put the Connected Mac into DFU")
-            case .reboot: tr("Redémarrer le Mac relié", "Restart the Connected Mac")
+            case .dfu: tr("Passer l'appareil relié en DFU", "Put the Connected Device into DFU")
+            case .reboot: tr("Redémarrer l'appareil relié", "Restart the Connected Device")
             }
         }
     }
 
     struct Outcome: Equatable {
+        enum Status: Equatable { case success, unconfirmed, failed }
         let command: Command
-        let success: Bool
+        let status: Status
         let output: String
         let date: Date
+        var success: Bool { status != .failed }
     }
 
     private(set) var running: Command?
@@ -51,8 +53,8 @@ final class DFUTool {
     /// Raison pour laquelle le DFU logiciel est indisponible sur ce Mac (nil = disponible).
     var unavailableReason: String? {
         if !Self.isAppleSiliconHost {
-            return tr("Ce Mac a un processeur Intel : le passage en DFU par câble nécessite un Mac Apple Silicon (ou Apple Configurator et la combinaison de touches).",
-                      "This Mac has an Intel processor: putting a Mac into DFU over the cable requires an Apple silicon Mac (or Apple Configurator and the key combination).")
+            return tr("Ce Mac a un processeur Intel : le passage en DFU par câble nécessite un Mac Apple Silicon (sinon, utilisez la combinaison de touches).",
+                      "This Mac has an Intel processor: entering DFU over the cable requires an Apple silicon Mac (otherwise, use the key combination).")
         }
         if Self.helperURL == nil {
             return tr("Outil DFU introuvable dans l'app (lancée hors bundle ?).",
@@ -65,12 +67,27 @@ final class DFUTool {
         guard running == nil, unavailableReason == nil, let helper = Self.helperURL else { return }
         guard confirm(command) else { return }
         running = command
+        let before = Set(ConnectedDevices.shared.devices.filter { $0.mode == .dfu }.map(\.id))
         Task {
             let result = await Task.detached(priority: .userInitiated) { Self.runPrivileged(helper, command.rawValue) }.value
+            if result.cancelled { running = nil; return }
+            let output = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            var status: Outcome.Status = result.success ? .success : .failed
+            // Un iPad / iPhone redémarre si vite qu'il ne répond pas à la commande : l'outil signale
+            // une erreur alors que tout s'est bien passé. Commande partie → on attend l'appareil en DFU.
+            let marker = command == .dfu ? "Rebooting target into DFU mode" : "Rebooting target into normal mode"
+            if !result.success, output.contains(marker) {
+                status = .unconfirmed
+                if command == .dfu {
+                    for _ in 0..<10 {
+                        try? await Task.sleep(for: .seconds(1.5))
+                        let now = Set(ConnectedDevices.shared.devices.filter { $0.mode == .dfu }.map(\.id))
+                        if !now.subtracting(before).isEmpty { status = .success; break }
+                    }
+                }
+            }
             running = nil
-            if result.cancelled { return }
-            lastOutcome = Outcome(command: command, success: result.success,
-                                  output: result.output.trimmingCharacters(in: .whitespacesAndNewlines), date: .now)
+            lastOutcome = Outcome(command: command, status: status, output: output, date: .now)
         }
     }
 
@@ -79,14 +96,14 @@ final class DFUTool {
         alert.alertStyle = .warning
         switch command {
         case .dfu:
-            alert.messageText = tr("Passer le Mac relié en mode DFU ?", "Put the connected Mac into DFU mode?")
-            alert.informativeText = tr("Le Mac relié à ce Mac par son port DFU va s'éteindre immédiatement et redémarrer en DFU : tout travail non enregistré sur ce Mac-là sera perdu.\n\nCe Mac n'est pas concerné. Un mot de passe administrateur va être demandé.",
-                                       "The Mac connected to this Mac through its DFU port will shut down immediately and restart in DFU: any unsaved work on that Mac will be lost.\n\nThis Mac is not affected. An administrator password will be requested.")
+            alert.messageText = tr("Passer l'appareil relié en mode DFU ?", "Put the connected device into DFU mode?")
+            alert.informativeText = tr("L'appareil relié à ce Mac en USB-C (Mac Apple Silicon, iPad ou iPhone) va s'éteindre immédiatement et redémarrer en DFU : tout travail non enregistré dessus sera perdu.\n\nCe Mac n'est pas concerné. Un mot de passe administrateur va être demandé.",
+                                       "The device connected to this Mac over USB-C (Apple silicon Mac, iPad or iPhone) will shut down immediately and restart in DFU: any unsaved work on it will be lost.\n\nThis Mac is not affected. An administrator password will be requested.")
             alert.addButton(withTitle: tr("Passer en DFU", "Enter DFU"))
         case .reboot:
-            alert.messageText = tr("Redémarrer le Mac relié ?", "Restart the connected Mac?")
-            alert.informativeText = tr("Le Mac relié redémarre normalement (sort du mode DFU). Un mot de passe administrateur va être demandé.",
-                                       "The connected Mac restarts normally (leaves DFU mode). An administrator password will be requested.")
+            alert.messageText = tr("Redémarrer l'appareil relié ?", "Restart the connected device?")
+            alert.informativeText = tr("L'appareil relié redémarre normalement (sort du mode DFU). Un mot de passe administrateur va être demandé.",
+                                       "The connected device restarts normally (leaves DFU mode). An administrator password will be requested.")
             alert.addButton(withTitle: tr("Redémarrer", "Restart"))
         }
         alert.addButton(withTitle: tr("Annuler", "Cancel"))
@@ -128,7 +145,7 @@ enum ManualDFUGuide: String, CaseIterable, Identifiable {
 
     @MainActor var title: String {
         switch self {
-        case .faceID: tr("iPhone 8 et ultérieurs · iPad sans bouton principal", "iPhone 8 and later · iPad without Home button")
+        case .faceID: tr("iPhone 8 et ultérieurs · iPad sans bouton principal (Lightning, ou sans second Mac)", "iPhone 8 and later · iPad without Home button (Lightning, or without a second Mac)")
         case .iPhone7: "iPhone 7 / 7 Plus"
         case .homeButton: tr("iPhone 6s et antérieurs · iPad avec bouton principal", "iPhone 6s and earlier · iPad with Home button")
         case .mac: tr("Mac Apple Silicon (sans second Mac)", "Apple silicon Mac (without a second Mac)")
