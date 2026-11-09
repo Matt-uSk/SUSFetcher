@@ -258,6 +258,19 @@ struct DFUPane: View {
                 } label: {
                     Label(tr("Avec les boutons", "Using the buttons"), systemImage: "hand.point.up.left")
                 }
+
+                HStack {
+                    Spacer()
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(diagnostic(), forType: .string)
+                    } label: {
+                        Label(tr("Copier le diagnostic", "Copy Diagnostics"), systemImage: "stethoscope")
+                    }
+                    .controlSize(.small)
+                    .help(tr("Copie l'état de la détection USB (à joindre à un rapport de bug)",
+                             "Copies the USB detection state (to attach to a bug report)"))
+                }
             }
             .padding(20)
             .frame(maxWidth: 760, alignment: .leading)
@@ -336,6 +349,28 @@ struct DFUPane: View {
         } label: {
             Label(tr("Mac Apple Silicon relié à ce Mac", "Apple silicon Mac connected to this Mac"), systemImage: "laptopcomputer.and.arrow.down")
         }
+    }
+}
+
+extension DFUPane {
+    func diagnostic() -> String {
+        var lines = ["SUS Fetcher \(Updater.shared.currentVersion ?? "dev") — "
+                     + "\(ProcessInfo.processInfo.operatingSystemVersionString) — "
+                     + (DFUTool.isAppleSiliconHost ? "Apple silicon" : "Intel")]
+        lines += ["", "## Détectés"]
+        for d in devices.devices {
+            lines.append("- \(d.mode.rawValue) id=\(d.id) product=\(d.productType ?? "-") name=\(d.deviceName ?? "-") "
+                         + "os=\(d.osVersion ?? "-") cpid=\(d.cpid.map { String(format: "%04X", $0) } ?? "-") "
+                         + "bdid=\(d.bdid.map { String(format: "%02X", $0) } ?? "-") → \(devices.identifier(of: d) ?? "?")")
+        }
+        lines += ["", "## MobileDevice : \(MobileDeviceBridge.shared.statusText)"]
+        lines += MobileDeviceBridge.shared.recentEvents.map { "- " + $0 }
+        lines += ["", "## USB Apple (IOKit)"]
+        lines += IOKitUSB.appleUSBSummary().map { "- " + $0 }
+        if let o = tool.lastOutcome {
+            lines += ["", "## Dernière commande DFU : \(o.command.rawValue) \(o.success ? "OK" : "échec")", o.output]
+        }
+        return lines.joined(separator: "\n")
     }
 }
 

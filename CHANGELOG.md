@@ -2,6 +2,16 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.0.0-beta.2] - 2026-11-09
+
+Pre-release for testing — published on the beta channel only.
+
+### Fixed
+- **Apple Silicon Mac in DFU not showing in Connected Devices.** Connected to another Apple Silicon Mac, a Mac in DFU doesn't appear as a standard USB DFU device but behind Apple's “Debug USB” interface. Devices in DFU / Recovery are now read through **MobileDevice** (the framework used by Finder and Apple Configurator), which reports their ECID, chip and board — so the Mac is detected and identified. The previous USB detection remains as a fallback.
+
+### Added
+- DFU Mode page: **Copy Diagnostics** button (detected devices, MobileDevice events, Apple USB devices, last DFU command output) to attach to a bug report.
+
 ## [2.0.0-beta.1] - 2026-11-09
 
 Pre-release for testing — published on the beta channel only.

@@ -36,6 +36,7 @@ final class ConnectedDevices {
     /// Lance la détection (toutes les 2 s : liste usbmuxd + parcours IOKit, très léger).
     func start() {
         guard task == nil else { return }
+        MobileDeviceBridge.shared.start()
         task = Task { [weak self] in
             while !Task.isCancelled {
                 guard let probe = self?.probe else { return }
@@ -105,14 +106,34 @@ actor DeviceProbe {
                                           deviceClass: v["DeviceClass"], osVersion: v["ProductVersion"],
                                           build: v["BuildVersion"],
                                           cpid: v["ChipID"].flatMap { Int($0) }, bdid: v["BoardId"].flatMap { Int($0) },
-                                          ecid: v["UniqueChipID"].flatMap { UInt64($0) }.map { String($0, radix: 16, uppercase: true) },
+                                          ecid: v["UniqueChipID"].flatMap { UInt64($0) }.map(formatECID),
                                           udid: udid))
         }
         // Oublie les appareils débranchés.
         let present = Set(muxed.map { $0.1 })
         lockdownCache = lockdownCache.filter { present.contains($0.key) }
 
-        result += IOKitUSB.restoreModeDevices()
+        // DFU / Recovery : MobileDevice (indispensable pour les Mac Apple Silicon), puis IOKit en secours.
+        var seen = Set(result.compactMap(\.ecid))
+        for e in MobileDeviceBridge.shared.snapshot() where e.ecid != 0 {
+            let mode: ConnectedDevice.Mode
+            switch e.state {
+            case 0: mode = .dfu
+            case 1, 2: mode = .recovery
+            default: continue        // démarré normalement : déjà couvert par usbmuxd
+            }
+            let ecid = formatECID(e.ecid)
+            guard seen.insert(ecid).inserted else { continue }
+            let product = e.product.flatMap { $0.contains(",") ? $0 : nil }
+            result.append(ConnectedDevice(id: ecid, mode: mode, productType: product,
+                                          deviceName: e.friendlyName,
+                                          cpid: e.chipID == 0 ? nil : Int(e.chipID),
+                                          bdid: e.chipID == 0 ? nil : Int(e.boardID),
+                                          ecid: ecid))
+        }
+        for d in IOKitUSB.restoreModeDevices() where d.ecid.map({ seen.insert($0).inserted }) ?? true {
+            result.append(d)
+        }
         return result.sorted { $0.id < $1.id }
     }
 }
@@ -137,6 +158,26 @@ enum IOKitUSB {
         return result
     }
 
+    /// Tous les périphériques USB Apple (diagnostic) : « Nom 0xPID serial ».
+    static func appleUSBSummary() -> [String] {
+        guard let matching = IOServiceMatching("IOUSBHostDevice") as NSMutableDictionary? else { return [] }
+        matching["idVendor"] = 0x05AC
+        var iterator: io_iterator_t = 0
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, matching as CFDictionary, &iterator) == KERN_SUCCESS else { return [] }
+        defer { IOObjectRelease(iterator) }
+        var lines: [String] = []
+        var service = IOIteratorNext(iterator)
+        while service != 0 {
+            let name = (property(service, "USB Product Name") as? String) ?? "?"
+            let pid = (property(service, "idProduct") as? NSNumber)?.intValue ?? 0
+            let serial = (property(service, "USB Serial Number") as? String) ?? ""
+            lines.append(String(format: "%@ 0x%04X %@", name, pid, serial))
+            IOObjectRelease(service)
+            service = IOIteratorNext(iterator)
+        }
+        return lines
+    }
+
     private static func makeDevice(_ service: io_object_t) -> ConnectedDevice? {
         let product = (property(service, "idProduct") as? NSNumber)?.intValue ?? 0
         let mode: ConnectedDevice.Mode
@@ -148,7 +189,7 @@ enum IOKitUSB {
         let serial = (property(service, "USB Serial Number") as? String)
             ?? (property(service, "kUSBSerialNumberString") as? String) ?? ""
         let fields = parseSerial(serial)
-        let ecid = fields["ECID"].map { $0.uppercased() }
+        let ecid = fields["ECID"].flatMap { UInt64($0, radix: 16) }.map(formatECID)
         let locationID = (property(service, "locationID") as? NSNumber)?.intValue ?? 0
         return ConnectedDevice(id: ecid ?? "usb-\(locationID)", mode: mode,
                                cpid: fields["CPID"].flatMap { Int($0, radix: 16) },
@@ -306,3 +347,6 @@ enum USBMuxClient {
         return ok ? data : nil
     }
 }
+
+/// ECID au même format quelle que soit la source (lockdownd en décimal, USB et MobileDevice en hexa).
+func formatECID(_ value: UInt64) -> String { String(format: "%016llX", value) }
