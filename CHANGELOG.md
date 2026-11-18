@@ -2,6 +2,14 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.2.0-beta.2] - 2026-11-18
+
+Pre-release for testing — published on the beta channel only.
+
+### Changed
+- Lighter interface: **show or hide table columns** with a right-click on the column headers (macOS standard menu, remembered). The *Security* and *Compat.* columns are now **hidden by default**.
+- **Right-click › Security & Compatibility…** on a macOS installer (or *Security…* on an IPSW) opens a sheet with the SOFA details: vulnerabilities fixed, actively exploited CVEs (links to NVD), recommendation, Apple advisory, “outdated” warning, and compatibility with this Mac / the selected Mac plus the full list of compatible models.
+
 ## [2.2.0-beta.1] - 2026-11-18
 
 Pre-release for testing — published on the beta channel only.

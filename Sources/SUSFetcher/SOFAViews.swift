@@ -160,3 +160,168 @@ struct CompatibilityMenu: View {
                  "Installer compatibility with \(name) (SOFA data)"))
     }
 }
+
+// MARK: - Fiche « Sécurité et compatibilité » (clic droit)
+
+struct SecurityInfoRequest: Identifiable {
+    let id = UUID()
+    let title: String
+    let platform: SOFAPlatform
+    let version: String
+    let build: String?
+    let identifier: String?
+}
+
+struct SecurityInfoView: View {
+    let request: SecurityInfoRequest
+    let state: ViewState
+    let sofa: SOFAModel
+
+    var body: some View {
+        let release = sofa.release(request.platform, version: request.version, build: request.build)
+        let later = sofa.laterReleases(request.platform, after: request.version, identifier: request.identifier)
+        let laterExploited = Set(later.flatMap(\.exploited))
+        let newest = later.max { $0.version.compare($1.version, options: .numeric) == .orderedAscending }
+
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(request.title).font(.title3.weight(.semibold))
+                Text([request.version, request.build].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "))
+                    .font(.callout.monospaced()).foregroundStyle(.secondary)
+            }
+            .padding(16)
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if !sofa.enabled {
+                        Label(tr("SOFA est désactivé (Réglages › Catalogue).", "SOFA is turned off (Settings › Catalog)."),
+                              systemImage: "power").foregroundStyle(.secondary)
+                    } else {
+                        securitySection(release)
+                        if !laterExploited.isEmpty, let newest {
+                            warningBox(tr("Version dépassée : les versions suivantes corrigent \(laterExploited.count) faille(s) activement exploitée(s). Préférez \(newest.version).",
+                                          "Outdated: later versions fix \(laterExploited.count) actively exploited vulnerabilit\(laterExploited.count > 1 ? "ies" : "y"). Prefer \(newest.version)."),
+                                       color: priorityColor(newest.priority ?? "critical"))
+                        } else if !later.isEmpty, let newest {
+                            Label(tr("Une version plus récente existe : \(newest.version).", "A newer version exists: \(newest.version)."),
+                                  systemImage: "arrow.up.circle").foregroundStyle(.secondary)
+                        }
+                        if request.platform == .macOS, let major = Int(request.version.split(separator: ".").first ?? "") {
+                            compatibilitySection(major)
+                        }
+                    }
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Divider()
+            HStack {
+                Link(tr("Source : SOFA", "Source: SOFA"), destination: SOFAModel.website).font(.caption)
+                Spacer()
+                Button(tr("Fermer", "Close")) { state.securityInfo = nil }
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(12)
+        }
+        .frame(width: 520, height: 480)
+        .environment(\.locale, AppSettings.shared.locale)
+    }
+
+    @ViewBuilder
+    private func securitySection(_ release: SOFARelease?) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(tr("Sécurité", "Security")).font(.headline)
+            if let r = release {
+                HStack(spacing: 8) {
+                    Image(systemName: r.exploited.isEmpty ? "shield.lefthalf.filled" : "exclamationmark.shield.fill")
+                        .foregroundStyle(r.exploited.isEmpty ? Color.secondary : priorityColor(r.priority))
+                    Text(tr("Corrige \(r.cveCount) faille(s) de sécurité", "Fixes \(r.cveCount) security issue(s)"))
+                    if let d = r.releaseDate {
+                        Text("· " + d.formatted(date: .abbreviated, time: .omitted)).foregroundStyle(.secondary)
+                    }
+                }
+                if !r.exploited.isEmpty {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(tr("Activement exploitées :", "Actively exploited:")).font(.callout.weight(.semibold))
+                        ForEach(r.exploited, id: \.self) { cve in
+                            if let url = URL(string: "https://nvd.nist.gov/vuln/detail/\(cve)") {
+                                Link(cve, destination: url).font(.callout.monospaced())
+                            }
+                        }
+                    }
+                    if let s = r.summary { Text(s).font(.callout).foregroundStyle(.secondary) }
+                }
+                if let rec = r.recommendation {
+                    Text(rec).font(.callout).foregroundStyle(priorityColor(r.priority))
+                }
+                if let url = r.securityInfo {
+                    Link(tr("Avis de sécurité Apple", "Apple security advisory"), destination: url).font(.callout)
+                }
+            } else {
+                Text(tr("Aucune information pour cette version (bêta, version trop ancienne, ou données pas encore chargées).",
+                        "No information for this version (beta, too old, or data not loaded yet)."))
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func compatibilitySection(_ major: Int) -> some View {
+        let models = sofa.macModelList.filter { sofa.supports(model: $0.id, major: major) == true }
+        VStack(alignment: .leading, spacing: 8) {
+            Text(tr("Compatibilité", "Compatibility")).font(.headline)
+            if let me = SOFAModel.thisMacModel {
+                compatRow(model: me, label: tr("Ce Mac", "This Mac"), major: major)
+            }
+            if let other = state.compatModel, other != SOFAModel.thisMacModel {
+                compatRow(model: other, label: tr("Mac choisi", "Selected Mac"), major: major)
+            }
+            if models.isEmpty {
+                Text(tr("Liste des modèles indisponible pour macOS \(major).", "Model list unavailable for macOS \(major)."))
+                    .font(.callout).foregroundStyle(.secondary)
+            } else {
+                DisclosureGroup(tr("\(models.count) modèles compatibles", "\(models.count) compatible models")) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(models) { m in
+                            HStack {
+                                Text(m.name)
+                                Spacer()
+                                Text(m.id).monospaced().foregroundStyle(.secondary)
+                            }
+                            .font(.caption)
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+                .font(.callout)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func compatRow(model: String, label: String, major: Int) -> some View {
+        let name = sofa.macModelName(model) ?? model
+        switch sofa.supports(model: model, major: major) {
+        case true?:
+            Label("\(label) (\(name)) : " + tr("compatible", "compatible"), systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green).font(.callout)
+        case false?:
+            Label("\(label) (\(name)) : " + tr("non compatible", "not compatible"), systemImage: "xmark.circle.fill")
+                .foregroundStyle(.red).font(.callout)
+        case nil:
+            Label("\(label) (\(name)) : " + tr("inconnu", "unknown"), systemImage: "questionmark.circle")
+                .foregroundStyle(.secondary).font(.callout)
+        }
+    }
+
+    private func warningBox(_ text: String, color: Color) -> some View {
+        Label(text, systemImage: "exclamationmark.triangle.fill")
+            .font(.callout)
+            .foregroundStyle(color)
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 8).fill(color.opacity(0.1)))
+    }
+}
