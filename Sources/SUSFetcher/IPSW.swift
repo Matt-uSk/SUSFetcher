@@ -786,6 +786,13 @@ struct IPSWFirmwareTable: View {
             }
             .width(min: 70, ideal: 80)
 
+            TableColumn(tr("Sécurité", "Security")) { f in
+                let isMac = IPSWFamily.mac.matches(device.identifier)
+                SecurityCell(platform: isMac ? .macOS : .iOS, version: f.version, build: f.build,
+                             identifier: isMac ? nil : device.identifier)
+            }
+            .width(min: 60, ideal: 90)
+
             TableColumn("") { f in
                 IPSWActionCell(firmware: f, device: device, downloads: downloads)
             }
