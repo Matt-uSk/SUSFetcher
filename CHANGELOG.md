@@ -2,6 +2,11 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.2.1] - 2026-11-19
+
+### Added
+- **Support the project**: a Ko-fi link in the app menu (*Support the Project (Ko-fi)…*) and in Settings › General. No pop-ups, ever.
+
 ## [2.2.0] - 2026-11-19
 
 ### Added

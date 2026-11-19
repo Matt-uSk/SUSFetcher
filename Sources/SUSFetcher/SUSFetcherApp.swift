@@ -22,6 +22,9 @@ struct SUSFetcherApp: App {
                 Button(tr("Rechercher les mises à jour…", "Check for Updates…")) {
                     Task { await Updater.shared.check(userInitiated: true) }
                 }
+                Button(tr("Soutenir le projet (Ko-fi)…", "Support the Project (Ko-fi)…")) {
+                    NSWorkspace.shared.open(supportURL)
+                }
             }
             CommandGroup(after: .sidebar) {
                 Button(tr("Installers macOS", "macOS Installers")) { viewState.sidebar = .installers }

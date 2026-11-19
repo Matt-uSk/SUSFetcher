@@ -81,6 +81,10 @@ Rien à modifier ni à recompiler. Au lancement, SUS Fetcher détecte la derniè
 
 Le catalogue public contient de toute façon les nouveaux installers (Apple les ajoute aussi aux anciens catalogues) ; la détection sert surtout aux canaux bêta, dont l'URL inclut le numéro de version. En dépannage, une URL de catalogue personnalisée peut être saisie dans les réglages.
 
+## Soutenir le projet
+
+SUS Fetcher est gratuit et le restera. S'il te fait gagner du temps, tu peux m'offrir un café sur **[Ko-fi](https://ko-fi.com/mattusk)** ☕ — merci !
+
 ## Historique des versions
 
 Voir [CHANGELOG.md](CHANGELOG.md) (en anglais).

@@ -300,6 +300,19 @@ struct SettingsView: View {
             Form {
                 generalSection
                 UpdatesSettingsSection(updater: Updater.shared)
+                Section {
+                    LabeledContent {
+                        Link(destination: supportURL) {
+                            Label(tr("M'offrir un café", "Buy me a coffee"), systemImage: "cup.and.saucer.fill")
+                        }
+                    } label: {
+                        Text(tr("SUS Fetcher est gratuit. S'il vous fait gagner du temps, un petit don sur Ko-fi fait toujours plaisir.",
+                                "SUS Fetcher is free. If it saves you time, a small tip on Ko-fi is always appreciated."))
+                            .font(.callout)
+                    }
+                } header: {
+                    Text(tr("Soutenir le projet", "Support the Project"))
+                }
             }
             .formStyle(.grouped)
             .tabItem { Label(tr("Général", "General"), systemImage: "gearshape") }
@@ -630,3 +643,6 @@ extension SidebarItem {
 
     @MainActor var isVisible: Bool { element.map { AppSettings.shared.isVisible($0) } ?? true }
 }
+
+/// Page de dons.
+let supportURL = URL(string: "https://ko-fi.com/mattusk")!

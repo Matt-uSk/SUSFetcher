@@ -81,6 +81,10 @@ Nothing to edit or recompile. At launch, SUS Fetcher detects the latest major ve
 
 The public catalog already includes new installers anyway (Apple also adds them to older catalogs); detection mostly matters for beta channels, whose URL contains the version number. For troubleshooting, a custom catalog URL can be entered in Settings.
 
+## Support the project
+
+SUS Fetcher is free and will stay that way. If it saves you time, you can buy me a coffee on **[Ko-fi](https://ko-fi.com/mattusk)** ☕ — thanks!
+
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md).
