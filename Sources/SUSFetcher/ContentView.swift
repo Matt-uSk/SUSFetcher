@@ -89,6 +89,33 @@ final class ViewState {
     var localSortOrder = [KeyPathComparator(\LocalFileRow.date, order: .reverse)]
     var localSelection = Set<URL>()
     var betaOnly = true
+    /// Mac de référence pour la compatibilité des installers (nil = ce Mac).
+    var compatModel: String? = UserDefaults.standard.string(forKey: "compatModel") {
+        didSet { UserDefaults.standard.set(compatModel, forKey: "compatModel") }
+    }
+    var hideIncompatible = false
+    /// Fiche « Sécurité et compatibilité » affichée (clic droit).
+    var securityInfo: SecurityInfoRequest?
+
+    /// Colonnes affichées / masquées (clic droit sur l'en-tête des tableaux), mémorisées.
+    var productColumns: TableColumnCustomization<SUProduct> = ViewState.loadColumns("productColumns") {
+        didSet { ViewState.saveColumns(productColumns, "productColumns") }
+    }
+    var ipswColumns: TableColumnCustomization<IPSWFirmware> = ViewState.loadColumns("ipswColumns") {
+        didSet { ViewState.saveColumns(ipswColumns, "ipswColumns") }
+    }
+
+    static func loadColumns<T>(_ key: String) -> TableColumnCustomization<T> {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let value = try? JSONDecoder().decode(TableColumnCustomization<T>.self, from: data) else { return .init() }
+        return value
+    }
+
+    static func saveColumns<T>(_ value: TableColumnCustomization<T>, _ key: String) {
+        if let data = try? JSONEncoder().encode(value) { UserDefaults.standard.set(data, forKey: key) }
+    }
+
+    var effectiveCompatModel: String? { compatModel ?? SOFAModel.thisMacModel }
 
     func showDownloads() {
         sidebar = .downloads
@@ -123,11 +150,15 @@ struct ContentView: View {
         .searchable(text: Binding(state, \.search), placement: .toolbar,
                     prompt: searchPrompt)
         .toolbar { toolbarContent }
+        .sheet(item: Binding(state, \.securityInfo)) { request in
+            SecurityInfoView(request: request, state: state, sofa: SOFAModel.shared)
+        }
         .task {
             if catalog.products.isEmpty { catalog.reload() }
             IPSWModel.shared.loadDevicesIfNeeded()
             LocalFiles.shared.rescan()
             ConnectedDevices.shared.start()
+            SOFAModel.shared.start()
             DFUTool.shared.refreshInstallState()
         }
         .onChange(of: catalog.channel) { catalog.reload() }
@@ -260,6 +291,7 @@ struct ContentView: View {
     private func catalogDetail(_ rows: [SUProduct]) -> some View {
         ProductTable(products: rows,
                      downloads: downloads,
+                     compatModel: state.effectiveCompatModel,
                      selection: Binding(state, \.selection),
                      sortOrder: Binding(state, \.sortOrder))
             .overlay { placeholder(rows) }
@@ -288,6 +320,10 @@ struct ContentView: View {
                 .fixedSize()
                 .disabled(!(sidebar?.isCatalog ?? true))
                 .help(tr("Canal du catalogue Apple", "Apple catalog channel"))
+            }
+            ToolbarItem {
+                CompatibilityMenu(state: state, sofa: SOFAModel.shared)
+                    .disabled(sidebar != .installers)
             }
             ToolbarItem {
                 Toggle(isOn: Binding(state, \.betaOnly)) {
@@ -332,7 +368,14 @@ struct ContentView: View {
     }
 
     private var rows: [SUProduct] {
-        filtered(visible(sidebar == .others ? catalog.others : catalog.installers))
+        var base = visible(sidebar == .others ? catalog.others : catalog.installers)
+        if sidebar == .installers, state.hideIncompatible, let model = state.effectiveCompatModel {
+            base = base.filter { p in
+                guard let major = p.macOSMajor else { return true }
+                return SOFAModel.shared.supports(model: model, major: major) != false
+            }
+        }
+        return filtered(base)
     }
 
     /// Recherche + tri appliqués à une liste de produits.
@@ -419,11 +462,13 @@ struct SidebarRow: View {
 struct ProductTable: View {
     let products: [SUProduct]
     let downloads: DownloadManager
+    var compatModel: String? = nil
     @Binding var selection: Set<SUProduct.ID>
     @Binding var sortOrder: [KeyPathComparator<SUProduct>]
 
     var body: some View {
-        Table(products, selection: $selection, sortOrder: $sortOrder) {
+        Table(products, selection: $selection, sortOrder: $sortOrder,
+              columnCustomization: Binding(ViewState.shared, \.productColumns)) {
             TableColumn(tr("Titre", "Title"), value: \.displayTitle) { p in
                 HStack(spacing: 6) {
                     Text(p.displayTitle)
@@ -433,35 +478,60 @@ struct ProductTable: View {
                 }
             }
             .width(min: 180, ideal: 240)
+            .customizationID("title")
+            .disabledCustomizationBehavior(.visibility)
 
             TableColumn("Version", value: \.versionString)
                 .width(min: 60, ideal: 80)
+                .customizationID("version")
 
             TableColumn("Build", value: \.buildString) { p in
                 Text(p.buildString).monospaced()
             }
             .width(min: 60, ideal: 80)
+            .customizationID("build")
 
             TableColumn("Date", value: \.postDate) { p in
                 Text(p.postDate, format: .dateTime.day(.twoDigits).month(.twoDigits).year())
                     .monospacedDigit()
             }
             .width(min: 80, ideal: 90)
+            .customizationID("date")
 
             TableColumn(tr("Taille", "Size"), value: \.totalSize) { p in
                 Text(formatBytes(p.totalSize)).monospacedDigit()
             }
             .width(min: 70, ideal: 80)
+            .customizationID("size")
 
             TableColumn("Product ID", value: \.id) { p in
                 Text(p.id).monospaced().foregroundStyle(.secondary)
             }
             .width(min: 80, ideal: 95)
+            .customizationID("productID")
+
+            TableColumn(tr("Sécurité", "Security")) { p in
+                if p.isInstaller, !p.isBeta {
+                    SecurityCell(platform: .macOS, version: p.versionString, build: p.buildString)
+                }
+            }
+            .width(min: 60, ideal: 90)
+            .customizationID("security")
+            .defaultVisibility(.hidden)
+
+            TableColumn(tr("Compat.", "Compat.")) { p in
+                CompatibilityCell(major: p.macOSMajor, model: compatModel)
+            }
+            .width(min: 44, ideal: 50)
+            .customizationID("compat")
+            .defaultVisibility(.hidden)
 
             TableColumn("") { p in
                 ProductActionCell(product: p, downloads: downloads)
             }
             .width(min: 170, ideal: 200)
+            .customizationID("actions")
+            .disabledCustomizationBehavior(.visibility)
         }
         .contextMenu(forSelectionType: SUProduct.ID.self) { ids in
             contextMenu(for: products.filter { ids.contains($0.id) })
@@ -493,6 +563,14 @@ struct ProductTable: View {
             }
             Button(tr("Copier les URLs des paquets", "Copy package URLs")) {
                 copy(p.packages.map(\.url.absoluteString).joined(separator: "\n"))
+            }
+            if p.isInstaller {
+                Divider()
+                Button(tr("Sécurité et compatibilité…", "Security & Compatibility…")) {
+                    ViewState.shared.securityInfo = SecurityInfoRequest(
+                        title: p.displayTitle, platform: .macOS, version: p.versionString,
+                        build: p.buildString, identifier: nil)
+                }
             }
         } else if selected.count > 1 {
             let installers = selected.filter { $0.installAssistant != nil }

@@ -117,6 +117,9 @@ struct DevicePane: View {
                 actions(d, identifier: identifier)
             }
             if let status = status(d, identifier: identifier) { status }
+            if d.mode == .normal, let v = d.osVersion, !(identifier.map { IPSWFamily.mac.matches($0) } ?? false) {
+                DeviceSecuritySummary(version: v, identifier: identifier)
+            }
             if let outcome = DFUTool.shared.lastOutcome, Date().timeIntervalSince(outcome.date) < 120 {
                 DFUOutcomeBanner(outcome: outcome)
             }

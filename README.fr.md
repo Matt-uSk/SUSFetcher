@@ -10,6 +10,7 @@ App macOS native (Swift/SwiftUI, Universal — Apple Silicon et Intel, macOS 14+
 
 - **Inspiré de [SUS Inspector](https://github.com/hjuutilainen/sus-inspector)** de Hannes Juutilainen. Le concept (parcourir le catalogue Apple Software Update et en extraire les paquets) vient de là. SUS Inspector reposant sur Python 2 / PyObjC, SUS Fetcher en est une réécriture complète et moderne, centrée sur le téléchargement des installers macOS. Aucun code de SUS Inspector n'a été repris.
 - **La majorité du code a été écrite par [Claude](https://claude.ai) (Anthropic)**.
+- Données de sécurité et de compatibilité : **[SOFA](https://sofa.macadmins.io)** de Mac Admins Open Source (Apache 2.0).
 - Le passage en DFU des Mac Apple Silicon utilise **[macvdmtool](https://github.com/AsahiLinux/macvdmtool)** des contributeurs Asahi Linux (Apache 2.0, voir `ThirdParty/macvdmtool`).
 
 ## Fonctions

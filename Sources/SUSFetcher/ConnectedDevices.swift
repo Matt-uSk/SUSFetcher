@@ -59,7 +59,7 @@ final class ConnectedDevices {
 
     /// Modèle commercial (« iPhone 17 Pro ») d'après ipsw.me.
     func modelName(of d: ConnectedDevice) -> String? {
-        identifier(of: d).flatMap { IPSWModel.shared.device($0)?.name }
+        identifier(of: d).flatMap { IPSWModel.shared.device($0)?.name ?? SOFAModel.shared.iosMarketingName($0) }
     }
 
     func displayName(of d: ConnectedDevice) -> String {

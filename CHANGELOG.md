@@ -2,6 +2,24 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.2.0-beta.2] - 2026-11-18
+
+Pre-release for testing — published on the beta channel only.
+
+### Changed
+- Lighter interface: **show or hide table columns** with a right-click on the column headers (macOS standard menu, remembered). The *Security* and *Compat.* columns are now **hidden by default**.
+- **Right-click › Security & Compatibility…** on a macOS installer (or *Security…* on an IPSW) opens a sheet with the SOFA details: vulnerabilities fixed, actively exploited CVEs (links to NVD), recommendation, Apple advisory, “outdated” warning, and compatibility with this Mac / the selected Mac plus the full list of compatible models.
+
+## [2.2.0-beta.1] - 2026-11-18
+
+Pre-release for testing — published on the beta channel only.
+
+### Added
+- **Security info** from [SOFA](https://sofa.macadmins.io) (Mac Admins Open Source): a *Security* column on macOS installers and IPSW firmwares shows how many vulnerabilities (CVEs) each version fixes, with a badge when some were **actively exploited** (red = exploited on Apple platforms, orange = exploited in another product per CISA KEV). Hover for the summary and recommendation, click to open Apple's security advisory. A ⚠️ warns when a newer version of the same series fixes actively exploited vulnerabilities.
+- **Connected iPhone / iPad**: the device page sums up what the updates since the installed version fix (“… 2 actively exploited”), with a link to the details.
+- **Compatibility**: a *Compat.* column on macOS installers (✓ / ✗ for this Mac, or any Mac model you pick), and a toolbar menu to **hide installers incompatible** with that Mac.
+- Settings › Catalog: SOFA on/off, last update, refresh. The feed is checked every 6 hours through its index (only downloaded when it changed) and cached for offline use.
+
 ## [2.1.0] - 2026-11-09
 
 ### Added

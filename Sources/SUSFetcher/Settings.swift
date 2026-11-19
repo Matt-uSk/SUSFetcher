@@ -326,7 +326,10 @@ struct SettingsView: View {
                 .formStyle(.grouped)
                 .tabItem { Label(tr("Synchronisation", "Sync"), systemImage: "arrow.triangle.2.circlepath") }
 
-            Form { catalogSection }
+            Form {
+                catalogSection
+                sofaSection
+            }
                 .formStyle(.grouped)
                 .tabItem { Label(tr("Catalogue", "Catalog"), systemImage: "list.bullet.rectangle") }
         }
@@ -433,6 +436,36 @@ struct SettingsView: View {
         } footer: {
             Text(tr("La dernière version de macOS est détectée automatiquement : rien à modifier quand une nouvelle version majeure sort. L'URL personnalisée (canal Public) n'est utile qu'en dépannage.",
                     "The latest macOS version is detected automatically: nothing to change when a new major version ships. The custom URL (Public channel) is only for troubleshooting."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var sofaSection: some View {
+        let sofa = SOFAModel.shared
+        return Section {
+            Toggle(tr("Afficher sécurité et compatibilité", "Show security and compatibility"),
+                   isOn: Binding(sofa, \.enabled))
+            LabeledContent(tr("Données", "Data")) {
+                HStack(spacing: 8) {
+                    if sofa.isRefreshing { ProgressView().controlSize(.small) }
+                    if let date = sofa.snapshot.fetched {
+                        Text(date, format: .relative(presentation: .named)).foregroundStyle(.secondary)
+                    } else {
+                        Text("—").foregroundStyle(.secondary)
+                    }
+                    Button(tr("Actualiser", "Refresh")) { sofa.refresh() }
+                        .disabled(!sofa.enabled || sofa.isRefreshing)
+                }
+            }
+            if let error = sofa.lastError {
+                Text(error).font(.caption).foregroundStyle(.red)
+            }
+        } header: {
+            Text("SOFA")
+        } footer: {
+            Text(tr("Failles corrigées par chaque version (et celles activement exploitées), et versions de macOS supportées par chaque Mac. Source : SOFA, Mac Admins Open Source (sofa.macadmins.io), vérifié toutes les 6 heures.",
+                    "Vulnerabilities fixed by each version (and actively exploited ones), and macOS versions supported by each Mac. Source: SOFA, Mac Admins Open Source (sofa.macadmins.io), checked every 6 hours."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

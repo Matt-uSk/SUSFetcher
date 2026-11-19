@@ -753,16 +753,20 @@ struct IPSWFirmwareTable: View {
     @Binding var sortOrder: [KeyPathComparator<IPSWFirmware>]
 
     var body: some View {
-        Table(firmwares, selection: $selection, sortOrder: $sortOrder) {
+        Table(firmwares, selection: $selection, sortOrder: $sortOrder,
+              columnCustomization: Binding(ViewState.shared, \.ipswColumns)) {
             TableColumn("Version", value: \.version) { f in
                 Text(f.version).fontWeight(f.signed ? .semibold : .regular)
             }
             .width(min: 60, ideal: 80)
+            .customizationID("version")
+            .disabledCustomizationBehavior(.visibility)
 
             TableColumn("Build", value: \.build) { f in
                 Text(f.build).monospaced()
             }
             .width(min: 70, ideal: 85)
+            .customizationID("build")
 
             TableColumn(tr("Signé", "Signed"), value: \.signedRank) { f in
                 if f.signed {
@@ -773,6 +777,7 @@ struct IPSWFirmwareTable: View {
                 }
             }
             .width(min: 70, ideal: 80)
+            .customizationID("signed")
 
             TableColumn("Date", value: \.sortDate) { f in
                 if let d = f.releaseDate {
@@ -780,22 +785,42 @@ struct IPSWFirmwareTable: View {
                 }
             }
             .width(min: 80, ideal: 90)
+            .customizationID("date")
 
             TableColumn(tr("Taille", "Size"), value: \.size) { f in
                 if f.size > 0 { Text(formatBytes(f.size)).monospacedDigit() }
             }
             .width(min: 70, ideal: 80)
+            .customizationID("size")
+
+            TableColumn(tr("Sécurité", "Security")) { f in
+                let isMac = IPSWFamily.mac.matches(device.identifier)
+                SecurityCell(platform: isMac ? .macOS : .iOS, version: f.version, build: f.build,
+                             identifier: isMac ? nil : device.identifier)
+            }
+            .width(min: 60, ideal: 90)
+            .customizationID("security")
+            .defaultVisibility(.hidden)
 
             TableColumn("") { f in
                 IPSWActionCell(firmware: f, device: device, downloads: downloads)
             }
             .width(min: 150, ideal: 170)
+            .customizationID("actions")
+            .disabledCustomizationBehavior(.visibility)
         }
         .contextMenu(forSelectionType: IPSWFirmware.ID.self) { ids in
             if let f = firmwares.first(where: { ids.contains($0.id) }) {
                 Button(tr("Copier l'URL", "Copy URL")) { copy(f.url.absoluteString) }
                 if let c = f.checksum {
                     Button(tr("Copier le \(c.algorithm.rawValue)", "Copy \(c.algorithm.rawValue)")) { copy(c.value) }
+                }
+                Divider()
+                Button(tr("Sécurité…", "Security…")) {
+                    let isMac = IPSWFamily.mac.matches(device.identifier)
+                    ViewState.shared.securityInfo = SecurityInfoRequest(
+                        title: "\(device.name) — \(f.version)", platform: isMac ? .macOS : .iOS,
+                        version: f.version, build: f.build, identifier: isMac ? nil : device.identifier)
                 }
             }
         } primaryAction: { ids in
