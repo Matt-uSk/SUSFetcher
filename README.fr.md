@@ -1,10 +1,22 @@
 <p align="center"><img src="Resources/AppIcon.svg" width="128" alt="SUS Fetcher"></p>
 
-# SUS Fetcher
+<h1 align="center">SUS Fetcher</h1>
 
-[![Ko-fi](https://img.shields.io/badge/Me%20soutenir%20sur%20Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/mattusk)
+<p align="center">
+  <b>Télécharge les installers macOS et les firmwares IPSW d'Apple, en un clic</b><br>
+  App macOS native — Apple Silicon et Intel, macOS 14+, sans aucune dépendance
+</p>
 
-🇬🇧 [English version](README.md)
+<p align="center">
+  <a href="https://github.com/Matt-uSk/SUSFetcher/releases/latest"><img src="https://img.shields.io/github/v/release/Matt-uSk/SUSFetcher?label=Version&color=2ea44f" alt="Release"></a>
+  <a href="https://github.com/Matt-uSk/SUSFetcher/releases"><img src="https://img.shields.io/github/downloads/Matt-uSk/SUSFetcher/total?label=T%C3%A9l%C3%A9chargements&color=0a84ff" alt="Downloads"></a>
+  <a href="#installation"><img src="https://img.shields.io/badge/macOS-14%2B-8e8e93?logo=apple&logoColor=white" alt="macOS 14+"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Historique-voir-6f42c1" alt="Changelog"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/Licence-MIT-0075ca" alt="MIT"></a>
+  <a href="https://ko-fi.com/mattusk"><img src="https://img.shields.io/badge/Ko--fi-Offrir%20un%20caf%C3%A9-FF5E5B?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
+</p>
+
+<p align="center">🇬🇧 <a href="README.md">English version</a></p>
 
 App macOS native (Swift/SwiftUI, Universal — Apple Silicon et Intel, macOS 14+, sans aucune dépendance) qui lit le catalogue Apple Software Update et télécharge `InstallAssistant.pkg` **en un clic**, sans passer par clic droit → Packages → InstallAssistant.pkg.
 
