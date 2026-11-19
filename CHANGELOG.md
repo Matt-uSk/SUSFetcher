@@ -2,6 +2,15 @@
 
 All notable changes to SUS Fetcher. Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.2.0] - 2026-11-19
+
+### Added
+- **Security & compatibility info** from [SOFA](https://sofa.macadmins.io) (Mac Admins Open Source): right-click a macOS installer › **Security & Compatibility…** (or an IPSW › **Security…**) for the vulnerabilities fixed, actively exploited CVEs (links to NVD), recommendation, Apple advisory, an “outdated” warning, and compatibility with this Mac / a selected Mac plus the full list of compatible models.
+- Optional **Security** and **Compat.** columns — right-click the column headers to show or hide any column (remembered); both are hidden by default.
+- Toolbar **Compatibility** menu: check installers against this Mac or any Mac model, and hide incompatible ones.
+- Connected iPhone / iPad page: summary of what the updates since the installed version fix.
+- Settings › Catalog: SOFA on/off, last update, refresh. The feed is checked every 6 hours via its index (downloaded only when it changed) and cached for offline use.
+
 ## [2.2.0-beta.2] - 2026-11-18
 
 Pre-release for testing — published on the beta channel only.
