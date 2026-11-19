@@ -10,6 +10,7 @@
 <p align="center">
   <a href="https://github.com/Matt-uSk/SUSFetcher/releases/latest"><img src="https://img.shields.io/github/v/release/Matt-uSk/SUSFetcher?label=Version&color=2ea44f" alt="Release"></a>
   <a href="https://github.com/Matt-uSk/SUSFetcher/releases"><img src="https://img.shields.io/github/downloads/Matt-uSk/SUSFetcher/total?label=T%C3%A9l%C3%A9chargements&color=0a84ff" alt="Downloads"></a>
+  <a href="https://github.com/Matt-uSk/SUSFetcher/stargazers"><img src="https://img.shields.io/github/stars/Matt-uSk/SUSFetcher?label=%C3%89toiles&color=f5a623&logo=github&logoColor=white" alt="Stars"></a>
   <a href="#installation"><img src="https://img.shields.io/badge/macOS-14%2B-8e8e93?logo=apple&logoColor=white" alt="macOS 14+"></a>
   <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Historique-voir-6f42c1" alt="Changelog"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Licence-MIT-0075ca" alt="MIT"></a>
