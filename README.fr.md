@@ -2,6 +2,8 @@
 
 # SUS Fetcher
 
+[![Ko-fi](https://img.shields.io/badge/Me%20soutenir%20sur%20Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/mattusk)
+
 🇬🇧 [English version](README.md)
 
 App macOS native (Swift/SwiftUI, Universal — Apple Silicon et Intel, macOS 14+, sans aucune dépendance) qui lit le catalogue Apple Software Update et télécharge `InstallAssistant.pkg` **en un clic**, sans passer par clic droit → Packages → InstallAssistant.pkg.
